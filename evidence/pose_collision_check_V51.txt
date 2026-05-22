@@ -4,7 +4,7 @@ Pose                            Status  min_joint_Z  Collision report
 ------------------------------------------------------------------------------------------------------------------------
 POSE_HOME                       PASS    1.0867 m
 POSE_APPROACH_CONVEYOR          PASS    1.0867 m
-POSE_PICK_CONVEYOR              PASS    1.0411 m
+POSE_PICK_CONVEYOR              PASS    1.0363 m
 POSE_LIFT_CONVEYOR              PASS    1.0867 m
 POSE_APPROACH_LOAD_FIXTURE      PASS    1.0867 m
 POSE_PLACE_LOAD_FIXTURE         PASS    1.0867 m
@@ -22,7 +22,7 @@ POSE_DROP_ACCEPT_BIN            PASS    1.0867 m
 POSE_APPROACH_REJECT_BIN        PASS    1.0867 m
 POSE_DROP_REJECT_BIN            PASS    1.0867 m
 
-Lowest gripper_body/tcp_tip world Z: 1.0091 m  (floor at z=0)
-Lowest joint origin Z (any joint, any pose): 1.0411 m
-Joint clearance margin: +0.0411 m above mesa_top
+Lowest gripper_body/tcp_tip world Z: 1.0033 m  (floor at z=0)
+Lowest joint origin Z (any joint, any pose): 1.0363 m
+Joint clearance margin: +0.0363 m above mesa_top
 Overall: PASS

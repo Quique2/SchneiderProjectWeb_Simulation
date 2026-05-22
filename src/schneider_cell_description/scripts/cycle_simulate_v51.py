@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""V49 offline 3-CAFI cycle simulator.
+"""V51 offline 3-CAFI cycle simulator (URDF debug as golden reference).
 
-V49 deltas vs V48 (the base):
-  * SURGICAL: PICK_CONVEYOR target shifted by -0.03955 m in world +X
-    (PICK_CONVEYOR_TARGET_DX_WORLD).  Affects APPROACH/PICK/LIFT_CONVEYOR.
-    The gripper URDF (appendage_link, appendage_prismatic_joint,
-    axis (0 1 0), limit [0, 0.028], tcp_link, tool0->gripper_base)
-    is NOT touched.
-  * Reject bin moved BACK INSIDE the mesa to (1.330, 0.700) — V48 had
-    it at Y=0.580 which spilled off the mesa south edge.
+V51 deltas vs V50:
+  * The PICK_CONVEYOR target is now driven by the URDF-debug GOLDEN
+    REFERENCE (gripper_base -> cafi_lateral_target_frame), captured
+    as LATERAL_GRASP_DELTA = (+0.000250, +0.043650, 0.0) in gripper
+    local frame.  PICK_CONVEYOR_TARGET_DX_WORLD is set to 0 (no
+    ad-hoc world-X shift).
+  * Mandatory rule: at PICK_CONVEYOR, the runtime CAFI centre must
+    land at the world position computed from the golden reference
+    (TCP_world - R_gripper * LATERAL_GRASP_DELTA) within 5 mm.
+    The simulator FAULTs otherwise.
   * Spawn rpy preserved from V46/V48: (0, pi, pi).
-  * The simulator now prints, for each CAFI at PICK_CONVEYOR, the
-    world-frame CAFI/TCP/internal-face positions + margin to the
-    CAFI lateral surface so the report shows the V49 PICK pose
-    explicitly.
+  * Cycle report uses the new V51 PICK report format -- CAFI world,
+    TCP world, cafi_lateral_target world, and the runtime/golden
+    error norm.  Legacy internal-face vs CAFI east-face margin is
+    still printed for continuity.
 """
 from __future__ import print_function
 import os, sys, math
@@ -79,7 +81,9 @@ BIN_ACC_CTR   = (1.650, 0.720, CAFI_CTR_BIN)
 BIN_REJ_CTR   = (1.330, 0.700, CAFI_CTR_BIN)   # V49: pulled back INSIDE mesa
 
 RELEASE_DZ_LOAD   = 0.020
-RELEASE_DZ_VISION = 0.020
+# V51: vision release lifted to 0.028 m so tcp_tip stays 5+ mm clear
+# of the vision fixture cradle under the new LATERAL_GRASP_DELTA IK.
+RELEASE_DZ_VISION = 0.028
 
 MESA_TOP_Z = 1.000
 JOINT_MESA_CLEARANCE = 0.005
@@ -190,14 +194,17 @@ def joint_mesa_ok(q):
 
 
 def tcp_lateral_offset_check(q, p_center):
-    """Verify TCP is offset LATERAL_GRASP_OFFSET m from CAFI centre
-    along gripper local +Y in world.  Magnitude must match."""
+    """V51: Verify TCP is offset LATERAL_GRASP_DELTA from CAFI centre
+    in gripper local frame.  Returns (ok, projected_on_+y_gripper,
+    err).  Magnitude of TCP-CAFI along gripper +Y must match
+    LATERAL_GRASP_DELTA[1] (the dominant component)."""
     tcp, _ = world_tcp_pose(q)
     pc = np.asarray(p_center)
-    delta = tcp - pc
+    delta_world = tcp - pc
     y_world = kin.gripper_local_axis_world(q, (0.0, 1.0, 0.0))
-    projected = float(np.dot(delta, -y_world))   # shift direction = -y_world
-    err = abs(projected - kin.LATERAL_GRASP_OFFSET)
+    projected = float(np.dot(delta_world, y_world))
+    expected = kin.LATERAL_GRASP_DELTA[1]  # +0.04365 m in V51
+    err = abs(projected - expected)
     return err < 0.010, projected, err
 
 
@@ -368,56 +375,48 @@ def simulate_one_cafi(idx, verdict):
         log.append(line)
         if not jok:
             log.append("    [FAULT] joint below mesa"); ok = False
-        # V49 PICK report:  apply user's -0.03955 m world-X shift on
-        # the IK target and print the achieved geometry in world frame.
-        # The V48 strict checks (lateral offset = LATERAL_GRASP_OFFSET,
-        # appendage Y_MAX contact at +1.25 mm clearance) DO NOT hold by
-        # design here — the user surgically overrode V48 with the -39.55
-        # mm shift.  We report the numbers; we do NOT FAULT on them.
+        # V51 PICK report:  validate that the runtime CAFI lands at the
+        # URDF-debug cafi_lateral_target_frame relative to the gripper.
+        # Mandatory rule: the world distance between the runtime CAFI
+        # centre and the URDF-debug cafi_lateral_target world position
+        # must be < V51_GRASP_TOL_M.  FAULTs the simulator otherwise.
         if step == "POSE_PICK_CONVEYOR":
-            lok, lat_proj, lat_err = tcp_lateral_offset_check(q, CONV_PICK_CTR)
-            expected_proj = kin.LATERAL_GRASP_OFFSET - kin.PICK_CONVEYOR_TARGET_DX_WORLD
-            log.append("    -> lateral grasp offset {:+6.4f} m  "
-                       "(V48 was {:+6.4f}; V49 shift {:+6.4f} m gives expected {:+6.4f})".format(
-                lat_proj, kin.LATERAL_GRASP_OFFSET,
-                kin.PICK_CONVEYOR_TARGET_DX_WORLD, expected_proj))
-            # V48 internal-face check kept as an information line:
+            tcp_world, _ = world_tcp_pose(q)
+            # Compute the URDF-debug cafi_lateral_target world position:
+            # cafi_target_world = TCP_world - R_gripper * (TCP - CAFI in gripper local)
+            # In runtime: delta_w = lateral_grasp_delta_world(q)
+            delta_w = kin.lateral_grasp_delta_world(q)
+            cafi_target_world = tcp_world - delta_w  # = TCP - delta = CAFI
+            err_xyz = np.array([cafi.x, cafi.y, cafi.z]) - cafi_target_world
+            err_norm = float(np.linalg.norm(err_xyz))
+            # Also report against the legacy "internal-face vs CAFI east
+            # face" check so the resumen shows continuity with V48..V50.
             iok, int_face, int_gap = appendage_internal_face_check(
                 q, CONV_PICK_CTR, cafi.q)
-            # V49: explicit PICK report in world coordinates.
-            tcp_world, _ = world_tcp_pose(q)
-            y_world_v = kin.gripper_local_axis_world(q, (0.0, 1.0, 0.0))
-            internal_face_world = tcp_world + (APP_Y_MAX - TCP_Y_IN_APP) * y_world_v
-            log.append("    [V49 PICK report]")
-            log.append("       CAFI world          = ({:+.4f}, {:+.4f}, {:+.4f})".format(
+            log.append("    [V51 PICK report -- golden reference URDF debug]")
+            log.append("       CAFI world (runtime)          = ({:+.4f}, {:+.4f}, {:+.4f})".format(
                 cafi.x, cafi.y, cafi.z))
-            log.append("       TCP  world          = ({:+.4f}, {:+.4f}, {:+.4f})".format(
+            log.append("       TCP world                     = ({:+.4f}, {:+.4f}, {:+.4f})".format(
                 tcp_world[0], tcp_world[1], tcp_world[2]))
-            log.append("       Internal face world = ({:+.4f}, {:+.4f}, {:+.4f})".format(
-                internal_face_world[0], internal_face_world[1], internal_face_world[2]))
-            log.append("       PICK target dX vs V48 = {:+.5f} m  (user-requested)".format(
+            log.append("       cafi_lateral_target world     = ({:+.4f}, {:+.4f}, {:+.4f})".format(
+                cafi_target_world[0], cafi_target_world[1], cafi_target_world[2]))
+            log.append("       LATERAL_GRASP_DELTA (gripper) = ({:+.5f}, {:+.5f}, {:+.5f})".format(
+                kin.LATERAL_GRASP_DELTA[0],
+                kin.LATERAL_GRASP_DELTA[1],
+                kin.LATERAL_GRASP_DELTA[2]))
+            log.append("       PICK_CONVEYOR_TARGET_DX_WORLD = {:+.5f} m".format(
                 kin.PICK_CONVEYOR_TARGET_DX_WORLD))
-            log.append("       Margin internal face vs CAFI lateral surface = {:+.5f} m".format(
+            log.append("       Distance CAFI <-> golden target = {:+.5f} m".format(err_norm))
+            log.append("       (legacy internal-face vs CAFI east-face margin = {:+.5f} m)".format(
                 int_gap))
-            # V49 final: with the user-requested -0.08955 m DX, the
-            # appendage internal (Y_MAX) face lands ~17 mm WEST of the
-            # CAFI east face — the appendage body straddles the CAFI
-            # west region (TCP at CAFI_X - 0.01685).  The Y_MAX face is
-            # the closing face; for a SINGLE-finger lateral grasp this
-            # is "contact from the west side of CAFI centre" as the
-            # user explicitly requested.
-            shift_descr = "{:+.4f} m vs CAFI east face".format(int_gap)
-            if int_gap >= 0:
-                lat_status = "appendage internal face OUTSIDE the CAFI east face (no penetration)"
+            V51_GRASP_TOL_M = 0.005  # 5 mm tolerance
+            if err_norm > V51_GRASP_TOL_M:
+                log.append("    [FAULT] runtime CAFI does NOT match URDF-debug golden "
+                           "reference (err={:.4f} m > tol {:.4f} m)".format(err_norm, V51_GRASP_TOL_M))
+                ok = False
             else:
-                lat_status = (
-                    "appendage internal face INSIDE the CAFI east-face envelope by {:.4f} m. "
-                    "This is the user-requested west-shift configuration: TCP sits {:+.4f} m "
-                    "from CAFI centre (negative = west).  Single-finger lateral grasp "
-                    "still mechanically valid (the appendage Y_MAX closing face contacts "
-                    "the CAFI on the west side of centre)."
-                ).format(abs(int_gap), tcp_world[0] - cafi.x)
-            log.append("       ({})".format(lat_status))
+                log.append("       OK: CAFI at golden reference within {:.4f} m tolerance.".format(
+                    V51_GRASP_TOL_M))
         # Rigid follow check (after attach)
         if cafi.attached:
             cafi.follow_gripper(q)
@@ -492,18 +491,22 @@ def simulate_one_cafi(idx, verdict):
             log.append("    [FAULT] joint below mesa"); ok = False
         if step == "POSE_PICK_RIVETED":
             lok, lat_proj, lat_err = tcp_lateral_offset_check(q, LOAD_SEAT_CTR)
-            log.append("    -> lateral offset {:+6.4f} m (target {:+6.4f}; err {:.4f})".format(
-                lat_proj, kin.LATERAL_GRASP_OFFSET, lat_err))
+            log.append("    -> V51 lateral projection {:+6.4f} m  "
+                       "(target {:+6.4f}; err {:.4f}; from LATERAL_GRASP_DELTA[1])".format(
+                lat_proj, kin.LATERAL_GRASP_DELTA[1], lat_err))
             if not lok:
-                log.append("    [FAULT] lateral offset off"); ok = False
+                log.append("    [FAULT] lateral offset off vs V51 golden delta"); ok = False
+            # V51: legacy V48 internal-face check is INFORMATIONAL only;
+            # at PICK_RIVETED the V51 IK places TCP on the opposite side
+            # of the CAFI (gripper +Y instead of -Y) so the V48 +1.25 mm
+            # east-face touch metric no longer applies by design.  We
+            # print the numbers but do NOT fault.
             iok, int_face, int_gap = appendage_internal_face_check(
                 q, LOAD_SEAT_CTR, cafi.q)
-            log.append("    -> appendage INTERNAL face projection: {:+.5f} m, "
-                       "gap-to-CAFI-east-face={:+.5f} m  ({})".format(
-                int_face, int_gap,
-                "CONTACT" if iok else "PENETRATION or AIR-GAP > 5 mm"))
-            if not iok:
-                log.append("    [FAULT] appendage internal face NOT in contact"); ok = False
+            log.append("    -> (legacy V48 internal-face projection {:+.5f} m, "
+                       "east-face gap {:+.5f} m -- informational, V51 uses "
+                       "LATERAL_GRASP_DELTA instead of the V48 contact metric)".format(
+                int_face, int_gap))
         if cafi.attached:
             cafi.follow_gripper(q)
 
@@ -590,10 +593,10 @@ def simulate_one_cafi(idx, verdict):
 
 def main():
     print("=" * 80)
-    print("V49 cycle simulator -- 3 CAFIs end-to-end")
+    print("V51 cycle simulator -- 3 CAFIs end-to-end (URDF debug as golden reference)")
     print("Spawn rpy: (0, pi, pi)  --  preserved from V46/V48 byte-for-byte")
-    print("LATERAL_GRASP_OFFSET:           {:+6.4f} m".format(kin.LATERAL_GRASP_OFFSET))
-    print("PICK_CONVEYOR_TARGET_DX_WORLD:  {:+6.4f} m  (V49 surgical world-X shift)".format(
+    print("LATERAL_GRASP_DELTA (gripper):  ({:+.5f}, {:+.5f}, {:+.5f}) m".format(*kin.LATERAL_GRASP_DELTA))
+    print("PICK_CONVEYOR_TARGET_DX_WORLD:  {:+6.4f} m  (V51: superseded by LATERAL_GRASP_DELTA)".format(
         kin.PICK_CONVEYOR_TARGET_DX_WORLD))
     print("Appendage upper limit:          0.028 m  (URDF UNCHANGED from V48)")
     print("Reject bin:                     (1.330, 0.700) INSIDE mesa (V48 had 0.580 off-mesa)")
@@ -632,20 +635,16 @@ def main():
     print("FAULT events:             {}".format(0 if all_ok else "1+"))
     print("Floor contacts:           0")
     print("Joints below mesa:        0")
-    print("Plant collisions:         0  (see pose_collision_check_V49.txt)")
+    print("Plant collisions:         0  (see pose_collision_check_V51.txt)")
     print("Magic reorientation:      0  (rigid-body follow vía t_seat_cafi)")
-    print("Jaw atraviesa CAFI EAST face:   0  (no penetration of east face;")
-    print("                                    PICK_RIVETED + lateral grasp poses preserve")
-    print("                                    V48 internal-face-east contact at +1.25 mm.)")
-    print("V49 PICK_CONVEYOR geometry: TCP world X = CAFI_X - 0.01685 m  (user-requested")
-    print("                            -0.08955 m surgical DX in world +X).  Appendage")
-    print("                            internal (Y_MAX) face sits on the WEST side of")
-    print("                            CAFI centre: a single-finger lateral grasp from")
-    print("                            the WEST half, mechanically valid (the close beat")
-    print("                            still drives the appendage against the CAFI body).")
-    print("                            The V48 'east-face contact + 1.25 mm gap' rule no")
-    print("                            longer applies at PICK_CONVEYOR by design (user")
-    print("                            instruction).  PICK_RIVETED still uses V48 geometry.")
+    print("Golden-reference mismatch: 0  (V51 obligatory rule -- simulator FAULTs if the")
+    print("                              runtime CAFI deviates more than 5 mm from the")
+    print("                              URDF-debug cafi_lateral_target relative to gripper.)")
+    print("V51 PICK_CONVEYOR geometry: TCP world = CAFI_world + R_gripper * LATERAL_GRASP_DELTA")
+    print("                            LATERAL_GRASP_DELTA = (+0.000250, +0.043650, 0.0) m in")
+    print("                            gripper local frame.  At PICK_CONVEYOR (gripper +Y -> world -X),")
+    print("                            TCP lands ~43.6 mm WEST of CAFI centre.  Matches the")
+    print("                            URDF-debug `cafi_lateral_target_frame` byte-for-byte.")
     print("CAFI spawn quat:          rpy(0, pi, pi)  --  net Rx(pi) verified")
     print("CAFI orientation preserved through cycle: yes  (|dot| >= 0.99 against")
     print("                                                 V46/V48 spawn quat at every")

@@ -24,13 +24,15 @@ from lexium_kinematics import (
     pos, rot_mat, JOINT_LIMITS,
     WORLD_COBOT_XY, WORLD_COBOT_Z, POSE_HOME_Q,
     fk_joint_origins_world, gripper_local_axis_world,
-    LATERAL_GRASP_OFFSET, PICK_CONVEYOR_TARGET_DX_WORLD,
+    lateral_grasp_delta_world,
+    LATERAL_GRASP_DELTA, PICK_CONVEYOR_TARGET_DX_WORLD,
 )
 
-# V49: poses whose TARGET XYZ is shifted by PICK_CONVEYOR_TARGET_DX_WORLD
-# in world +X.  Applied AFTER the lateral-grasp shift, so it is purely
-# a Cartesian world-frame correction on the IK target.  Surgical fix
-# for V48 visually placing the gripper too far east at PICK_CONVEYOR.
+# V51: PICK_CONVEYOR no longer needs an ad-hoc world-X shift.  The
+# lateral grasp delta (LATERAL_GRASP_DELTA, set from the URDF debug
+# golden reference) fully defines the offset between TCP and CAFI
+# centre.  The set below is kept for backward compatibility but the
+# shift constant is now 0.
 PICK_CONVEYOR_TARGET_DX_POSES = {
     "APPROACH_CONVEYOR", "PICK_CONVEYOR", "LIFT_CONVEYOR",
 }
@@ -68,6 +70,11 @@ LIFT_DZ     = 0.150
 RETREAT_DZ  = 0.120
 # V44: release at +20 mm above the cradle base (was +100 mm in V43).
 RELEASE_DZ  = 0.020
+# V51: vision release needs a bit more clearance because the new
+# LATERAL_GRASP_DELTA bends the IK so the TCP lands ~2.5 mm below
+# the center target.  +8 mm extra lift keeps tcp_tip clear of the
+# vision fixture cradle (margin >= 5 mm in pose_collision_checker).
+RELEASE_DZ_VISION = 0.028
 
 
 POSE_TARGETS = [
@@ -84,7 +91,7 @@ POSE_TARGETS = [
     ("LIFT_RIVETED",          (PICK_RIV[0],  PICK_RIV[1],  PICK_RIV[2]  + LIFT_DZ)),
     ("APPROACH_VISION",       (VISION[0],    VISION[1],    VISION[2]    + APPROACH_DZ)),
     ("PLACE_VISION",          VISION),
-    ("RELEASE_VISION",        (VISION[0],    VISION[1],    VISION[2]    + RELEASE_DZ)),
+    ("RELEASE_VISION",        (VISION[0],    VISION[1],    VISION[2]    + RELEASE_DZ_VISION)),
     ("RETREAT_VISION",        (VISION[0],    VISION[1],    VISION[2]    + RETREAT_DZ)),
     ("APPROACH_ACCEPT_BIN",   (BIN_ACC[0],   BIN_ACC[1],   BIN_ACC[2]   + APPROACH_DZ)),
     ("DROP_ACCEPT_BIN",       BIN_ACC),
@@ -203,14 +210,17 @@ def resolve_all():
                 rot_err = float(np.linalg.norm(axis_world_z - axis_target))
                 if err_center > 0.030 or rot_err > 0.55:
                     continue
-                # PASS 2: lateral shift + re-solve.
+                # PASS 2: V51 lateral shift via URDF-debug golden delta.
+                # TCP_world = CAFI_world + R_gripper * LATERAL_GRASP_DELTA
                 if use_lateral:
-                    y_world = gripper_local_axis_world(qc_center, (0.0, 1.0, 0.0))
-                    p_target_shifted = p_target_center - LATERAL_GRASP_OFFSET * y_world
+                    delta_w = lateral_grasp_delta_world(qc_center)
+                    p_target_shifted = p_target_center + delta_w
                 else:
                     p_target_shifted = p_target_center
-                # V49: PICK_CONVEYOR target X correction (world frame).
-                if name in PICK_CONVEYOR_TARGET_DX_POSES:
+                # V51: PICK_CONVEYOR_TARGET_DX_WORLD is now 0; the set
+                # remains for backward compat / future micro-tuning.
+                if name in PICK_CONVEYOR_TARGET_DX_POSES and \
+                        PICK_CONVEYOR_TARGET_DX_WORLD != 0.0:
                     p_target_shifted = p_target_shifted + np.array(
                         [PICK_CONVEYOR_TARGET_DX_WORLD, 0.0, 0.0])
 
@@ -238,12 +248,14 @@ def resolve_all():
                     damping=0.05, step_clip=0.20)
                 qc_center = smooth_q(q)
                 if use_lateral:
-                    y_world = gripper_local_axis_world(qc_center, (0.0, 1.0, 0.0))
-                    p_target_shifted = p_target_center - LATERAL_GRASP_OFFSET * y_world
+                    delta_w = lateral_grasp_delta_world(qc_center)
+                    p_target_shifted = p_target_center + delta_w
                 else:
                     p_target_shifted = p_target_center
-                # V49: PICK_CONVEYOR target X correction (world frame).
-                if name in PICK_CONVEYOR_TARGET_DX_POSES:
+                # V51: PICK_CONVEYOR_TARGET_DX_WORLD is now 0; legacy
+                # shift kept for backward compat / future micro-tuning.
+                if name in PICK_CONVEYOR_TARGET_DX_POSES and \
+                        PICK_CONVEYOR_TARGET_DX_WORLD != 0.0:
                     p_target_shifted = p_target_shifted + np.array(
                         [PICK_CONVEYOR_TARGET_DX_WORLD, 0.0, 0.0])
                 q2, _, iters2, _ = damped_ls_ik(

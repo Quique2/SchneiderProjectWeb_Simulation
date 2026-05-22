@@ -351,6 +351,85 @@
       <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
+    <!-- V51 golden-reference grasp frames (RViz-only, from the user's
+         debug URDF).  These DO NOT change kinematics; they make the
+         expected CAFI grasp pose visible in RViz so the runtime can
+         be checked against the golden reference. -->
+    <link name="${name}_gripper_grasp_center_frame">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.006"/></geometry>
+        <material name="${name}_grasp_center_yellow">
+          <color rgba="1.0 0.9 0.0 0.85"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${name}_gripper_grasp_center_fixed_joint" type="fixed">
+      <parent link="${name}_gripper_base"/>
+      <child  link="${name}_gripper_grasp_center_frame"/>
+      <origin xyz="0.000000 0.016600 0.076750" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_appendage_inner_contact_frame">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.0045"/></geometry>
+        <material name="${name}_appendage_inner_yellow">
+          <color rgba="1.0 0.9 0.0 0.85"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${name}_appendage_inner_contact_fixed_joint" type="fixed">
+      <parent link="${name}_appendage_link"/>
+      <child  link="${name}_appendage_inner_contact_frame"/>
+      <origin xyz="0.000250 0.060250 0.076750" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_fixed_jaw_inner_contact_frame">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.0045"/></geometry>
+        <material name="${name}_fixed_jaw_yellow">
+          <color rgba="1.0 0.9 0.0 0.85"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${name}_fixed_jaw_inner_contact_fixed_joint" type="fixed">
+      <parent link="${name}_gripper_base"/>
+      <child  link="${name}_fixed_jaw_inner_contact_frame"/>
+      <origin xyz="0.000000 -0.027050 0.076750" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_cafi_lateral_target_frame">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.0055"/></geometry>
+        <material name="${name}_cafi_target_green">
+          <color rgba="0.0 1.0 0.0 0.85"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${name}_cafi_lateral_target_fixed_joint" type="fixed">
+      <parent link="${name}_gripper_base"/>
+      <child  link="${name}_cafi_lateral_target_frame"/>
+      <origin xyz="0.000000 0.016600 0.076750" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_grasp_volume_frame">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.126 0.090 0.030"/></geometry>
+        <material name="${name}_grasp_volume_cyan">
+          <color rgba="0.1 0.8 1.0 0.25"/>
+        </material>
+      </visual>
+    </link>
+    <joint name="${name}_grasp_volume_fixed_joint" type="fixed">
+      <parent link="${name}_cafi_lateral_target_frame"/>
+      <child  link="${name}_grasp_volume_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
   </xacro:macro>
 
 </robot>

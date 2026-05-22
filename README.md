@@ -1,4 +1,4 @@
-# Schneider Project — Simulation (V49)
+# Schneider Project — Simulation (V51)
 
 Simulación ROS 1 (catkin) de la celda de remachado Schneider con cobot
 Lexium L03S. Estructurada en 14 paquetes: 3 del cobot Lexium (descripción,
@@ -8,6 +8,9 @@ visión, gestor de objetos, visualización y HMI).
 
 Este repositorio contiene únicamente la parte de **simulación**. Está
 pensado para integrarse posteriormente con un proyecto web/control externo.
+
+Para los detalles de la versión actual ver
+[`schneider_cell_description_V51_resumen.md`](schneider_cell_description_V51_resumen.md).
 
 ## Estructura
 

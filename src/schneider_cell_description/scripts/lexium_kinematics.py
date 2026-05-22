@@ -1,10 +1,42 @@
-"""V49 Lexium L03S kinematics (V48 base + PICK_CONVEYOR target X correction).
+"""V51 Lexium L03S kinematics (URDF debug as golden reference).
 
-V49 deltas vs V48:
-  * NEW Cartesian shift PICK_CONVEYOR_TARGET_DX_WORLD = -0.03955 m
-    applied to the APPROACH/PICK/LIFT_CONVEYOR target in world +X.
-    Surgical fix at the user's request (V48 had the gripper too far
-    east).  No gripper URDF, joint axis, or appendage geometry change.
+V51 deltas vs V50:
+  * The lateral grasp is no longer described by a hand-tuned scalar
+    `LATERAL_GRASP_OFFSET` and a `PICK_CONVEYOR_TARGET_DX_WORLD`
+    correction; both were the result of geometric estimation that
+    fought RViz reality.  V51 takes the relationship directly from
+    the user-supplied URDF debug ("golden reference"):
+
+        gripper_base -> tcp_link              = (+0.000250, +0.060250, +0.076750)
+        gripper_base -> cafi_lateral_target   = (+0.000000, +0.016600, +0.076750)
+        gripper_base -> fixed_jaw_inner       = (+0.000000, -0.027050, +0.076750)
+        gripper_base -> appendage_inner       = (+0.000250, +0.060250, +0.076750) at q=0
+
+    From these (all in gripper_base local frame), the "lateral grasp
+    delta" between TCP and CAFI center is:
+
+        LATERAL_GRASP_DELTA = TCP - CAFI_target
+                            = (+0.000250, +0.043650, +0.000000)
+
+    i.e. TCP sits +43.65 mm along gripper local +Y from the CAFI
+    centre, with a negligible +0.25 mm in gripper local +X.  The
+    IK target for any lateral grasp pose is therefore
+
+        TCP_world = CAFI_world + R_gripper_world * LATERAL_GRASP_DELTA
+
+    where R_gripper_world is the gripper's world rotation at the IK
+    solution (top-down for all current poses).  This replaces the
+    old `p_center - L * y_world` formulation and removes the need
+    for an ad-hoc PICK_CONVEYOR DX correction (set to 0 in V51).
+
+  * The cobot URDF (`lexium_cobot_with_final_gripper.urdf`) gains the
+    debug frames (gripper_grasp_center_frame, fixed_jaw_inner_contact
+    _frame, appendage_inner_contact_frame, cafi_lateral_target_frame,
+    grasp_volume_frame, debug_cafi_in_gripper_link) so RViz shows the
+    golden reference.  NO change to the active gripper mechanism:
+    appendage_link, appendage_prismatic_joint (axis 0 1 0, limit
+    [0, 0.028]), tcp_link offset, tool0->gripper_base, mesh files
+    all byte-for-byte from V48/V49/V50.
   * Cobot URDF (`lexium_cobot_with_final_gripper`) preserved
     byte-for-byte from V48.  `appendage_prismatic_joint` axis (0 1 0),
     limit [0, 0.028], tcp_link offset (0.00025, 0.06025, 0.07675),
@@ -136,7 +168,9 @@ GRIPPER_JAW_STROKE = 0.028  # full open stroke, m (V48: was 0.015 in V46)
 #       LATERAL_GRASP_OFFSET = -(TCP - CAFI) . gripper_Y = +0.07145 m
 #   Add a 1.25 mm cosmetic clearance so the contact is "touching"
 #   rather than coincident (avoids RViz Z-fight + sim contact jitter):
-LATERAL_GRASP_OFFSET = 0.0727  # V48 (was 0.082 in V46 = 10.55 mm air gap)
+# V48 legacy scalar -- kept for any module that still imports it.
+# In V51 the lateral grasp is described by LATERAL_GRASP_DELTA below.
+LATERAL_GRASP_OFFSET = 0.0727  # V48 legacy -- not used by V51 IK
 # Sanity:
 #   At L = 0.0727, IK target TCP = CAFI + 0.0727 along world +X.
 #       Appendage Y_MAX face world X = TCP_x - 0.00995 = CAFI_x +
@@ -150,16 +184,28 @@ LATERAL_GRASP_OFFSET = 0.0727  # V48 (was 0.082 in V46 = 10.55 mm air gap)
 #   0.09075 m (≈ +29 mm clear of the east face) — ample margin
 #   during approach.
 
-# V49: PICK_CONVEYOR target X correction (world frame).  In RViz the
-# user observed at V48 that the gripper was "demasiado pasado" past the
-# CAFI -- the IK target for PICK_CONVEYOR placed the gripper too far
-# east, so the appendage clamped on the wrong lateral edge.  The fix
-# is a surgical Cartesian shift of the PICK_CONVEYOR (and its
-# APPROACH/LIFT siblings) target by -39.55 mm in world +X.  This
-# affects ONLY the IK target; the gripper URDF (appendage_link,
-# appendage_prismatic_joint, axis (0 1 0), limit [0, 0.028],
-# tcp_link offset, tool0->gripper_base) is NOT touched.
-PICK_CONVEYOR_TARGET_DX_WORLD = -0.03955  # m, world +X (negative = westward)
+# V51: PICK_CONVEYOR target X correction set back to ZERO.
+# The new LATERAL_GRASP_DELTA captures the gripper-to-CAFI offset
+# directly from the URDF debug; no ad-hoc world-X shift is needed.
+PICK_CONVEYOR_TARGET_DX_WORLD = 0.0  # V51: superseded by LATERAL_GRASP_DELTA
+
+# V51 golden reference, extracted byte-for-byte from the user-supplied
+# URDF debug (gripper_base local frame, q=0 / jaw closed):
+TCP_IN_GRIPPER_BASE             = (0.000250, 0.060250, 0.076750)
+CAFI_LATERAL_TARGET_IN_GRIPPER  = (0.000000, 0.016600, 0.076750)
+GRIPPER_GRASP_CENTER_IN_GRIPPER = (0.000000, 0.016600, 0.076750)  # alias
+FIXED_JAW_INNER_IN_GRIPPER      = (0.000000, -0.027050, 0.076750)
+APPENDAGE_INNER_IN_GRIPPER      = (0.000250, 0.060250, 0.076750)  # at q=0
+
+# LATERAL_GRASP_DELTA = TCP - CAFI_lateral_target in gripper_base
+# local frame.  This is the vector that, projected to world through
+# R_gripper_world, places the runtime CAFI centre at the URDF-debug
+# cafi_lateral_target_frame relative to the gripper.
+LATERAL_GRASP_DELTA = (
+    TCP_IN_GRIPPER_BASE[0] - CAFI_LATERAL_TARGET_IN_GRIPPER[0],  # +0.000250
+    TCP_IN_GRIPPER_BASE[1] - CAFI_LATERAL_TARGET_IN_GRIPPER[1],  # +0.043650
+    TCP_IN_GRIPPER_BASE[2] - CAFI_LATERAL_TARGET_IN_GRIPPER[2],  # +0.000000
+)
 # Applied AFTER the lateral-shift computation (p_center -
 # LATERAL_GRASP_OFFSET * y_world) as an additive world-frame
 # correction.  See resolve_poses.py for the call site.  Applies to
@@ -296,16 +342,29 @@ def gripper_local_axis_world(q, axis_local):
     return w / n
 
 
-def lateral_target_for_pick(q_seed, p_center):
-    """V44: given a seed q and a desired CAFI-centre world target,
-    return the SHIFTED target so the TCP lands LATERAL_GRASP_OFFSET m
-    away from the centre along the gripper's local +Y closing axis.
-    The shift direction is computed from the seed's orientation, so an
-    iterative caller can refine it.
+def lateral_grasp_delta_world(q_seed):
+    """V51 helper: given a seed joint config, return the LATERAL_GRASP
+    _DELTA vector expressed in WORLD frame.  This is the world-frame
+    translation from CAFI centre to TCP for a lateral grasp at the
+    URDF-debug golden reference pose.
     """
+    x_world = gripper_local_axis_world(q_seed, (1.0, 0.0, 0.0))
     y_world = gripper_local_axis_world(q_seed, (0.0, 1.0, 0.0))
+    z_world = gripper_local_axis_world(q_seed, (0.0, 0.0, 1.0))
+    return (LATERAL_GRASP_DELTA[0] * x_world +
+            LATERAL_GRASP_DELTA[1] * y_world +
+            LATERAL_GRASP_DELTA[2] * z_world)
+
+
+def lateral_target_for_pick(q_seed, p_center):
+    """V51: given a seed q and a desired CAFI-centre world target,
+    return the SHIFTED TCP target so the runtime CAFI centre lands at
+    the URDF-debug cafi_lateral_target_frame relative to the gripper.
+    Replaces the V44 scalar formulation.
+    """
+    delta_w = lateral_grasp_delta_world(q_seed)
     p_center = np.asarray(p_center, dtype=float)
-    return p_center - LATERAL_GRASP_OFFSET * y_world
+    return p_center + delta_w
 
 
 def pos(M):

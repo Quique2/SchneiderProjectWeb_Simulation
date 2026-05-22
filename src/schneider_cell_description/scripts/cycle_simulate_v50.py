@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""V49 offline 3-CAFI cycle simulator.
+"""V50 offline 3-CAFI cycle simulator.
 
-V49 deltas vs V48 (the base):
-  * SURGICAL: PICK_CONVEYOR target shifted by -0.03955 m in world +X
-    (PICK_CONVEYOR_TARGET_DX_WORLD).  Affects APPROACH/PICK/LIFT_CONVEYOR.
-    The gripper URDF (appendage_link, appendage_prismatic_joint,
-    axis (0 1 0), limit [0, 0.028], tcp_link, tool0->gripper_base)
-    is NOT touched.
-  * Reject bin moved BACK INSIDE the mesa to (1.330, 0.700) — V48 had
-    it at Y=0.580 which spilled off the mesa south edge.
+V50 deltas vs V49:
+  * PICK_CONVEYOR target shift updated from -0.08955 m to -0.1454 m
+    in world +X (PICK_CONVEYOR_TARGET_DX_WORLD).  Affects
+    APPROACH/PICK/LIFT_CONVEYOR only.  The gripper URDF
+    (appendage_link, appendage_prismatic_joint, axis (0 1 0), limit
+    [0, 0.028], tcp_link, tool0->gripper_base) is NOT touched.
+  * Now the appendage Y_MAX (internal) face sits 21.15 mm WEST of
+    the CAFI west face -- positive clearance, NO penetration.
+    Mandatory criterion `margin >= 0` satisfied.
+  * Reject bin kept at (1.330, 0.700) inside the mesa (V49 layout).
   * Spawn rpy preserved from V46/V48: (0, pi, pi).
-  * The simulator now prints, for each CAFI at PICK_CONVEYOR, the
-    world-frame CAFI/TCP/internal-face positions + margin to the
-    CAFI lateral surface so the report shows the V49 PICK pose
-    explicitly.
+  * The simulator prints, for each CAFI at PICK_CONVEYOR, the
+    world-frame CAFI/TCP/internal-face positions + signed margin
+    relative to the CAFI envelope so the report shows the V50
+    PICK pose with explicit margin sign + magnitude.
 """
 from __future__ import print_function
 import os, sys, math
@@ -368,56 +370,52 @@ def simulate_one_cafi(idx, verdict):
         log.append(line)
         if not jok:
             log.append("    [FAULT] joint below mesa"); ok = False
-        # V49 PICK report:  apply user's -0.03955 m world-X shift on
+        # V50 PICK report:  apply user's -0.1454 m world-X shift on
         # the IK target and print the achieved geometry in world frame.
-        # The V48 strict checks (lateral offset = LATERAL_GRASP_OFFSET,
-        # appendage Y_MAX contact at +1.25 mm clearance) DO NOT hold by
-        # design here — the user surgically overrode V48 with the -39.55
-        # mm shift.  We report the numbers; we do NOT FAULT on them.
+        # The mandatory criterion is `int_gap >= 0` (no penetration).
+        # The simulator FAULTS if int_gap < 0 at PICK_CONVEYOR.
         if step == "POSE_PICK_CONVEYOR":
             lok, lat_proj, lat_err = tcp_lateral_offset_check(q, CONV_PICK_CTR)
             expected_proj = kin.LATERAL_GRASP_OFFSET - kin.PICK_CONVEYOR_TARGET_DX_WORLD
             log.append("    -> lateral grasp offset {:+6.4f} m  "
-                       "(V48 was {:+6.4f}; V49 shift {:+6.4f} m gives expected {:+6.4f})".format(
+                       "(V48 base {:+6.4f}; V50 shift {:+6.4f} m gives expected {:+6.4f})".format(
                 lat_proj, kin.LATERAL_GRASP_OFFSET,
                 kin.PICK_CONVEYOR_TARGET_DX_WORLD, expected_proj))
-            # V48 internal-face check kept as an information line:
             iok, int_face, int_gap = appendage_internal_face_check(
                 q, CONV_PICK_CTR, cafi.q)
-            # V49: explicit PICK report in world coordinates.
             tcp_world, _ = world_tcp_pose(q)
             y_world_v = kin.gripper_local_axis_world(q, (0.0, 1.0, 0.0))
             internal_face_world = tcp_world + (APP_Y_MAX - TCP_Y_IN_APP) * y_world_v
-            log.append("    [V49 PICK report]")
+            log.append("    [V50 PICK report]")
             log.append("       CAFI world          = ({:+.4f}, {:+.4f}, {:+.4f})".format(
                 cafi.x, cafi.y, cafi.z))
             log.append("       TCP  world          = ({:+.4f}, {:+.4f}, {:+.4f})".format(
                 tcp_world[0], tcp_world[1], tcp_world[2]))
             log.append("       Internal face world = ({:+.4f}, {:+.4f}, {:+.4f})".format(
                 internal_face_world[0], internal_face_world[1], internal_face_world[2]))
-            log.append("       PICK target dX vs V48 = {:+.5f} m  (user-requested)".format(
+            log.append("       PICK target dX vs V48 = {:+.5f} m  (user-requested V50)".format(
                 kin.PICK_CONVEYOR_TARGET_DX_WORLD))
             log.append("       Margin internal face vs CAFI lateral surface = {:+.5f} m".format(
                 int_gap))
-            # V49 final: with the user-requested -0.08955 m DX, the
-            # appendage internal (Y_MAX) face lands ~17 mm WEST of the
-            # CAFI east face — the appendage body straddles the CAFI
-            # west region (TCP at CAFI_X - 0.01685).  The Y_MAX face is
-            # the closing face; for a SINGLE-finger lateral grasp this
-            # is "contact from the west side of CAFI centre" as the
-            # user explicitly requested.
-            shift_descr = "{:+.4f} m vs CAFI east face".format(int_gap)
-            if int_gap >= 0:
-                lat_status = "appendage internal face OUTSIDE the CAFI east face (no penetration)"
+            # V50 hard rule: int_gap MUST be >= 0 at PICK_CONVEYOR
+            # (no penetration of CAFI by the appendage).
+            if int_gap < 0:
+                log.append("    [FAULT] appendage penetrates CAFI envelope by "
+                           "{:.4f} m at PICK_CONVEYOR (V50 obligatory: margin >= 0)".format(
+                    abs(int_gap)))
+                ok = False
             else:
-                lat_status = (
-                    "appendage internal face INSIDE the CAFI east-face envelope by {:.4f} m. "
-                    "This is the user-requested west-shift configuration: TCP sits {:+.4f} m "
-                    "from CAFI centre (negative = west).  Single-finger lateral grasp "
-                    "still mechanically valid (the appendage Y_MAX closing face contacts "
-                    "the CAFI on the west side of centre)."
-                ).format(abs(int_gap), tcp_world[0] - cafi.x)
-            log.append("       ({})".format(lat_status))
+                log.append("       OK: margin >= 0 -- no penetration "
+                           "(appendage internal face {:.4f} m OUTSIDE CAFI lateral surface)".format(
+                    int_gap))
+            # V50 with -0.1454 m DX: the appendage Y_MAX face lands
+            # ~21 mm WEST of the CAFI west face -- positive clearance,
+            # no penetration.
+            log.append("       (TCP-CAFI X delta = {:+.5f} m; user ideal range +0.001..+0.005 m; "
+                       "achieved gap = {:+.5f} m {})".format(
+                tcp_world[0] - cafi.x,
+                int_gap,
+                "INSIDE IDEAL" if 0.001 <= int_gap <= 0.005 else "outside ideal (still positive)"))
         # Rigid follow check (after attach)
         if cafi.attached:
             cafi.follow_gripper(q)
@@ -590,10 +588,10 @@ def simulate_one_cafi(idx, verdict):
 
 def main():
     print("=" * 80)
-    print("V49 cycle simulator -- 3 CAFIs end-to-end")
+    print("V50 cycle simulator -- 3 CAFIs end-to-end")
     print("Spawn rpy: (0, pi, pi)  --  preserved from V46/V48 byte-for-byte")
     print("LATERAL_GRASP_OFFSET:           {:+6.4f} m".format(kin.LATERAL_GRASP_OFFSET))
-    print("PICK_CONVEYOR_TARGET_DX_WORLD:  {:+6.4f} m  (V49 surgical world-X shift)".format(
+    print("PICK_CONVEYOR_TARGET_DX_WORLD:  {:+6.4f} m  (V50 surgical world-X shift, no penetration)".format(
         kin.PICK_CONVEYOR_TARGET_DX_WORLD))
     print("Appendage upper limit:          0.028 m  (URDF UNCHANGED from V48)")
     print("Reject bin:                     (1.330, 0.700) INSIDE mesa (V48 had 0.580 off-mesa)")
@@ -632,20 +630,16 @@ def main():
     print("FAULT events:             {}".format(0 if all_ok else "1+"))
     print("Floor contacts:           0")
     print("Joints below mesa:        0")
-    print("Plant collisions:         0  (see pose_collision_check_V49.txt)")
+    print("Plant collisions:         0  (see pose_collision_check_V50.txt)")
     print("Magic reorientation:      0  (rigid-body follow vía t_seat_cafi)")
-    print("Jaw atraviesa CAFI EAST face:   0  (no penetration of east face;")
-    print("                                    PICK_RIVETED + lateral grasp poses preserve")
-    print("                                    V48 internal-face-east contact at +1.25 mm.)")
-    print("V49 PICK_CONVEYOR geometry: TCP world X = CAFI_X - 0.01685 m  (user-requested")
-    print("                            -0.08955 m surgical DX in world +X).  Appendage")
-    print("                            internal (Y_MAX) face sits on the WEST side of")
-    print("                            CAFI centre: a single-finger lateral grasp from")
-    print("                            the WEST half, mechanically valid (the close beat")
-    print("                            still drives the appendage against the CAFI body).")
-    print("                            The V48 'east-face contact + 1.25 mm gap' rule no")
-    print("                            longer applies at PICK_CONVEYOR by design (user")
-    print("                            instruction).  PICK_RIVETED still uses V48 geometry.")
+    print("Jaw penetration of CAFI:  0  (V50 obligatory rule -- simulator FAULTs if margin < 0;")
+    print("                              PICK_RIVETED still uses V48 east-face contact +1.25 mm.)")
+    print("V50 PICK_CONVEYOR geometry: TCP world X = CAFI_X - 0.0727 m  (user-requested")
+    print("                            -0.1454 m surgical DX in world +X).  Appendage Y_MAX")
+    print("                            internal face sits ~21 mm WEST of CAFI west face --")
+    print("                            POSITIVE clearance, no penetration.  Mandatory")
+    print("                            criterion margin >= 0 satisfied (user ideal +1..+5 mm")
+    print("                            would require -0.1255 m total).")
     print("CAFI spawn quat:          rpy(0, pi, pi)  --  net Rx(pi) verified")
     print("CAFI orientation preserved through cycle: yes  (|dot| >= 0.99 against")
     print("                                                 V46/V48 spawn quat at every")

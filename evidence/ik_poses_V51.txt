@@ -1,3 +1,7 @@
+  [warn] APPROACH_LOAD_FIXTURE: lateral-IK failed, retrying without orientation constraint
+  [warn] RETREAT_LOAD_FIXTURE: lateral-IK failed, retrying without orientation constraint
+  [warn] APPROACH_PICK_RIVETED: lateral-IK failed, retrying without orientation constraint
+  [warn] LIFT_RIVETED: lateral-IK failed, retrying without orientation constraint
 Pose                       q1       q2       q3       q4       q5       q6       CenterTgt XYZ           FK XYZ                  Err(mm)  Valid
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 HOME                       +0.000  +0.000  +0.000  +1.571  -1.571  +0.000  (+1.104,+0.868,+1.433)  (+1.104,+0.868,+1.433)     0.00  PASS  (iters=0)
@@ -20,7 +24,28 @@ DROP_ACCEPT_BIN            +2.210  +0.480  +1.810  -0.799  -1.531  +2.210  (+1.6
 APPROACH_REJECT_BIN        +1.226  -0.443  +2.178  -0.198  -1.524  +1.225  (+1.330,+0.700,+1.137)  (+1.286,+0.700,+1.135)     0.03  PASS  (iters=3)
 DROP_REJECT_BIN            +1.226  -0.032  +2.523  -0.954  -1.524  +1.225  (+1.330,+0.700,+1.017)  (+1.286,+0.700,+1.015)     0.02  PASS  (iters=3)
 
-Summary: 19/19 poses PASS (<= 25 mm)
+Summary: 19/19 poses PASS (<= 25 mm cart err)
 
-Per-joint mesa clearance worst case: 1.0363 m
+Per-joint mesa clearance check (must be >= mesa_top + 5 mm = 1.005):
+  POSE_HOME                     min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_CONVEYOR        min_joint_Z=1.0867 m  PASS
+  POSE_PICK_CONVEYOR            min_joint_Z=1.0363 m  PASS
+  POSE_LIFT_CONVEYOR            min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_LOAD_FIXTURE    min_joint_Z=1.0867 m  PASS
+  POSE_PLACE_LOAD_FIXTURE       min_joint_Z=1.0867 m  PASS
+  POSE_RELEASE_LOAD_FIXTURE     min_joint_Z=1.0867 m  PASS
+  POSE_RETREAT_LOAD_FIXTURE     min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_PICK_RIVETED    min_joint_Z=1.0867 m  PASS
+  POSE_PICK_RIVETED             min_joint_Z=1.0867 m  PASS
+  POSE_LIFT_RIVETED             min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_VISION          min_joint_Z=1.0867 m  PASS
+  POSE_PLACE_VISION             min_joint_Z=1.0867 m  PASS
+  POSE_RELEASE_VISION           min_joint_Z=1.0867 m  PASS
+  POSE_RETREAT_VISION           min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_ACCEPT_BIN      min_joint_Z=1.0867 m  PASS
+  POSE_DROP_ACCEPT_BIN          min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_REJECT_BIN      min_joint_Z=1.0867 m  PASS
+  POSE_DROP_REJECT_BIN          min_joint_Z=1.0867 m  PASS
+Worst case across all poses: min_joint_Z = 1.0363 m
 Joint-mesa fails: 0
+Wrote validate_robot_poses.txt and resolved_poses.py
