@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Standalone Lexium Cobot LXMRL03S0000 display. -->
+
+  <arg name="use_gui" default="true"/>
+  <arg name="rviz_config"
+       default="$(find lexium_cobot_description)/rviz/display_l03s.rviz"/>
+
+  <param name="robot_description"
+         command="$(find xacro)/xacro
+                  $(find lexium_cobot_description)/urdf/lexium_cobot_l03s_standalone.urdf.xacro"/>
+
+  <node name="joint_state_publisher_gui"
+        pkg="joint_state_publisher_gui"
+        type="joint_state_publisher_gui"
+        if="$(arg use_gui)"
+        output="screen"/>
+  <node name="joint_state_publisher"
+        pkg="joint_state_publisher"
+        type="joint_state_publisher"
+        unless="$(arg use_gui)"
+        output="screen"/>
+
+  <node name="robot_state_publisher"
+        pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        output="screen"/>
+
+  <node name="rviz" pkg="rviz" type="rviz"
+        args="-d $(arg rviz_config)"
+        output="screen"/>
+</launch>

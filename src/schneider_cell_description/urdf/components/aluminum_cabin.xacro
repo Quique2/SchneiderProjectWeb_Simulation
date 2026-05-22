@@ -1,0 +1,199 @@
+<?xml version="1.0"?>
+<!--
+  aluminum_cabin.xacro  -  V36 cabin (REAL 50 x 50 mm aluminum profiles)
+  ===========================================================================
+  Real Schneider planta cabin: 4 posts at 50 x 50 mm cross-section
+  running from floor (z = 0) to top profile top (z = 2.07 m).  4 top
+  perimeter profiles close the frame, with their TOP face flush with
+  the structure top.  No walls / panels so the cell stays visible.
+
+  Cobot ceiling mount: 2 longitudinal cross-beams (in X direction) at
+  the cobot mount Y, plus a transverse beam at the cobot mount X to
+  triangulate.  The cobot mounting flange bolts on to the underside of
+  the top profile at z = cobot_mount_z (= top_z - 0.050 if
+  cobot_mount_z is the top-profile bottom face).
+
+  V36 differences vs V35:
+    * post_section default 0.045 -> 0.050 (REAL profile cross-section).
+    * top_z default raised so the user-supplied total structure
+      height (2.07 m) can be set from the call site.
+    * The top profile is built so its TOP face lands exactly at top_z
+      (i.e. the post tops run from 0 to top_z - profile_section, and
+      the top profile sits on the posts with its centre at
+      top_z - profile_section/2).  V35 had the profile centre at
+      top_z + profile/2 (above the post tops).
+    * The drop bracket from the top of the cabin to the cobot mount
+      can shrink to 0 when cobot_mount_z = top_z - profile_section
+      (cobot bolted directly to the top profile underside).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <material name="alum_extrusion"><color rgba="0.78 0.78 0.80 1.0"/></material>
+  <material name="alum_dark">     <color rgba="0.35 0.35 0.38 1.0"/></material>
+  <material name="alum_accent">   <color rgba="0.20 0.55 0.30 1.0"/></material>
+
+  <!-- 50 x 50 mm extrusion bar macro (length aligned along axis "X","Y","Z") -->
+  <xacro:macro name="alu_bar"
+               params="name parent xyz rpy length axis:='X'
+                       section:=0.050">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <xacro:if value="${axis == 'X'}">
+            <box size="${length} ${section} ${section}"/>
+          </xacro:if>
+          <xacro:if value="${axis == 'Y'}">
+            <box size="${section} ${length} ${section}"/>
+          </xacro:if>
+          <xacro:if value="${axis == 'Z'}">
+            <box size="${section} ${section} ${length}"/>
+          </xacro:if>
+        </geometry>
+        <material name="alum_extrusion"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="aluminum_cabin"
+               params="name parent
+                       x_min x_max y_min y_max
+                       top_z post_section:=0.050
+                       cobot_mount_x cobot_mount_y cobot_mount_z">
+
+    <xacro:property name="x_len" value="${x_max - x_min}"/>
+    <xacro:property name="y_len" value="${y_max - y_min}"/>
+    <xacro:property name="x_mid" value="${(x_min + x_max) / 2.0}"/>
+    <xacro:property name="y_mid" value="${(y_min + y_max) / 2.0}"/>
+    <!-- Posts run from floor (z=0) up to (top_z - post_section), so the
+         top profile sits ON the posts with its TOP face at top_z.
+         post_len = top_z - post_section.  post_centre_z = post_len/2. -->
+    <xacro:property name="post_len" value="${top_z - post_section}"/>
+    <xacro:property name="post_centre_z" value="${post_len / 2.0}"/>
+    <xacro:property name="top_profile_centre_z"
+                    value="${top_z - post_section/2.0}"/>
+
+    <!-- ===== 4 vertical posts (50 x 50 mm, floor to top profile underside) -->
+    <xacro:alu_bar name="${name}_post_sw" parent="${parent}"
+                   xyz="${x_min} ${y_min} ${post_centre_z}"
+                   rpy="0 0 0" length="${post_len}" axis="Z"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_post_se" parent="${parent}"
+                   xyz="${x_max} ${y_min} ${post_centre_z}"
+                   rpy="0 0 0" length="${post_len}" axis="Z"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_post_nw" parent="${parent}"
+                   xyz="${x_min} ${y_max} ${post_centre_z}"
+                   rpy="0 0 0" length="${post_len}" axis="Z"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_post_ne" parent="${parent}"
+                   xyz="${x_max} ${y_max} ${post_centre_z}"
+                   rpy="0 0 0" length="${post_len}" axis="Z"
+                   section="${post_section}"/>
+
+    <!-- ===== Top perimeter frame (4 bars) =====
+         Sitting ON the post tops; their top face is at top_z. -->
+    <xacro:alu_bar name="${name}_top_s" parent="${parent}"
+                   xyz="${x_mid} ${y_min} ${top_profile_centre_z}"
+                   rpy="0 0 0" length="${x_len}" axis="X"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_top_n" parent="${parent}"
+                   xyz="${x_mid} ${y_max} ${top_profile_centre_z}"
+                   rpy="0 0 0" length="${x_len}" axis="X"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_top_w" parent="${parent}"
+                   xyz="${x_min} ${y_mid} ${top_profile_centre_z}"
+                   rpy="0 0 0" length="${y_len}" axis="Y"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_top_e" parent="${parent}"
+                   xyz="${x_max} ${y_mid} ${top_profile_centre_z}"
+                   rpy="0 0 0" length="${y_len}" axis="Y"
+                   section="${post_section}"/>
+
+    <!-- ===== Bottom perimeter (2 horizontal bars low so they
+                 do not block view of the cell process) ===== -->
+    <xacro:alu_bar name="${name}_bot_s" parent="${parent}"
+                   xyz="${x_mid} ${y_min} ${post_section/2.0}"
+                   rpy="0 0 0" length="${x_len}" axis="X"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_bot_n" parent="${parent}"
+                   xyz="${x_mid} ${y_max} ${post_section/2.0}"
+                   rpy="0 0 0" length="${x_len}" axis="X"
+                   section="${post_section}"/>
+
+    <!-- ===== Cobot ceiling cross-beams.
+         Two parallel bars in X direction at the cobot mount Y, plus a
+         short transverse bar at the cobot mount X to triangulate.
+         They sit at the SAME Z as the perimeter top profile so the
+         load path goes straight into the perimeter frame. ===== -->
+    <xacro:alu_bar name="${name}_cobot_beam_a" parent="${parent}"
+                   xyz="${x_mid} ${cobot_mount_y - 0.150}
+                        ${top_profile_centre_z}"
+                   rpy="0 0 0" length="${x_len}" axis="X"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_cobot_beam_b" parent="${parent}"
+                   xyz="${x_mid} ${cobot_mount_y + 0.150}
+                        ${top_profile_centre_z}"
+                   rpy="0 0 0" length="${x_len}" axis="X"
+                   section="${post_section}"/>
+    <xacro:alu_bar name="${name}_cobot_xbeam" parent="${parent}"
+                   xyz="${cobot_mount_x} ${cobot_mount_y}
+                        ${top_profile_centre_z}"
+                   rpy="0 0 0" length="0.350" axis="Y"
+                   section="${post_section}"/>
+
+    <!-- ===== Mounting plate from top-profile underside to cobot mount.
+         When cobot_mount_z == top_z - post_section the plate
+         degenerates to a thin (4 mm) flange disc — the cobot is
+         bolted DIRECTLY to the top profile underside, no drop. ===== -->
+    <xacro:property name="profile_underside_z"
+                    value="${top_z - post_section}"/>
+    <xacro:property name="drop_len_raw"
+                    value="${profile_underside_z - cobot_mount_z}"/>
+    <xacro:property name="drop_len_final"
+                    value="${0.004 if drop_len_raw &lt; 0.004 else drop_len_raw}"/>
+    <link name="${name}_cobot_flange">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.060" length="${drop_len_final}"/>
+        </geometry>
+        <material name="alum_dark"/>
+      </visual>
+      <visual>
+        <origin xyz="0 0 ${-drop_len_final/2.0 + 0.003}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.062" length="0.006"/></geometry>
+        <material name="alum_accent"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_cobot_flange" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_cobot_flange"/>
+      <origin xyz="${cobot_mount_x} ${cobot_mount_y}
+                   ${(profile_underside_z + cobot_mount_z)/2.0}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== Small label plate on the SW post (cosmetic) ===== -->
+    <link name="${name}_label_plate">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.005 0.120 0.040"/></geometry>
+        <material name="alum_accent"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_label_plate" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_label_plate"/>
+      <origin xyz="${x_min + 0.030} ${y_min + 0.250} 1.300"
+              rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

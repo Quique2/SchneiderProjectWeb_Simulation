@@ -1,0 +1,422 @@
+<?xml version="1.0"?>
+<!--
+  lexium_cobot_l03s.urdf.xacro  -  V30
+  ===========================================================================
+  Articulated 6-DOF URDF/xacro reconstruction of the Schneider Electric
+  Lexium Cobot LXMRL03S0000, built from the 12 visual STL meshes that
+  the user exported from the SolidWorks assembly (planta Schneider/Cobot).
+
+  Each STL is exported in the SAME GLOBAL FRAME, with the arm in its
+  product HOME pose: pedestal at Y=0, flange at Y~565 mm.  In this CAD
+  convention the assembly +Y axis is the real-world VERTICAL (the cobot
+  is exported lying along +Y for easier viewing).
+
+  The chain below maps the STLs onto a clean 6-DOF chain so that at q=0
+  the meshes line up byte-for-byte with the exported assembly.
+
+      base_link            link0_base.stl
+        |  joint1 (revolute Y) at top of base, axis along CAD +Y
+      shoulder_link        link1_shoulder_rotation.stl
+                           link2_shoulder_connector.stl  (fixed visual)
+        |  joint2 (revolute X) at center of shoulder
+      upper_arm_link       link2_elbow_joint.stl
+        |  joint3 (revolute X) at elbow drum
+      forearm_link         link3_forearm.stl
+                           link3_elbow_connector.stl  (fixed visual on end)
+        |  joint4 (revolute Y) at end of forearm
+      wrist1_link          link4_wrist1_cylinder.stl
+        |  joint5 (revolute X) at wrist pitch
+      wrist2_link          link5_wrist2_body.stl
+                           link5_wrist2_cylinder.stl   (fixed visual)
+        |  joint6 (revolute Y) at wrist roll
+      wrist3_link          link6_wrist3_cylinder.stl
+                           link6_wrist3_upper_body.stl (fixed visual)
+      flange_link          link6_tool_flange.stl       (fixed to wrist3)
+      tool0                empty TCP frame
+
+  Joint origins (in PARENT frame, q=0) and visual offsets are computed so
+  that each mesh appears at its exported global STL position at q=0.
+
+  Joint limits per LXMRL03S0000 datasheet:
+      J1 +/-360 deg = +/-6.283185
+      J2 +/-150 deg = +/-2.617994
+      J3 +/-150 deg = +/-2.617994
+      J4 +/-360 deg = +/-6.283185
+      J5 +/-120 deg = +/-2.094395
+      J6 +/-360 deg = +/-6.283185
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="lexium_cobot_l03s">
+
+  <!-- ===== Materials ================================================== -->
+  <material name="lexium_white">  <color rgba="0.92 0.92 0.92 1.0"/></material>
+  <material name="lexium_dark">   <color rgba="0.18 0.18 0.18 1.0"/></material>
+  <material name="lexium_green">  <color rgba="0.20 0.60 0.30 1.0"/></material>
+  <material name="lexium_flange"> <color rgba="0.55 0.55 0.55 1.0"/></material>
+  <material name="lexium_steel">  <color rgba="0.70 0.70 0.72 1.0"/></material>
+
+  <!-- ===== Joint physical limits (LXMRL03S0000 datasheet) ============== -->
+  <xacro:property name="J1_LIM" value="6.283185307"/>   <!-- +/-360 deg -->
+  <xacro:property name="J2_LIM" value="2.617993878"/>   <!-- +/-150 deg -->
+  <xacro:property name="J3_LIM" value="2.617993878"/>   <!-- +/-150 deg -->
+  <xacro:property name="J4_LIM" value="6.283185307"/>   <!-- +/-360 deg -->
+  <xacro:property name="J5_LIM" value="2.094395102"/>   <!-- +/-120 deg -->
+  <xacro:property name="J6_LIM" value="6.283185307"/>   <!-- +/-360 deg -->
+
+  <xacro:property name="J_EFF"  value="56.0"/>
+  <xacro:property name="J_VEL"  value="3.1416"/>
+
+  <!-- ===== Inertial placeholder helper (small mass + diag inertia) ===== -->
+  <xacro:macro name="placeholder_inertial" params="mass:=1.5">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia ixx="0.005" iyy="0.005" izz="0.005"
+               ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ===== Macro: lexium_cobot_l03s ====================================
+       params:
+         name        prefix for links and joints
+         parent      parent link to anchor the base on (typically world or
+                     a cabin ceiling mount frame)
+         mount_xyz   xyz from parent origin to base_link origin
+         mount_rpy   rpy from parent origin to base_link orientation;
+                     use "3.141592653589793 0 0" to hang the cobot upside
+                     down from a ceiling mount (Rx(pi)).
+  -->
+  <xacro:macro name="lexium_cobot_l03s"
+               params="name parent
+                       mount_xyz:='0 0 0'
+                       mount_rpy:='0 0 0'">
+
+    <!-- ============================================================
+         base_link (link0_base.stl)  -  pedestal
+         ============================================================ -->
+    <link name="${name}_base_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link0_base.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <collision>
+        <origin xyz="0.0645 0.043 0.065" rpy="0 0 0"/>
+        <geometry><box size="0.130 0.090 0.130"/></geometry>
+      </collision>
+      <xacro:placeholder_inertial mass="3.0"/>
+    </link>
+
+    <joint name="${parent}_to_${name}_base_link" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_base_link"/>
+      <origin xyz="${mount_xyz}" rpy="${mount_rpy}"/>
+    </joint>
+
+    <!-- ============================================================
+         joint1 + shoulder_link (link1_shoulder_rotation.stl) — J1
+         J1 axis = CAD +Y (vertical in the assembly).
+         Origin chosen at the centerline of the rotation drum where it
+         interfaces with the top of link0 (Y=0.086).
+         link1 mesh bbox is X[0,0.098] Y[0.086,0.210] Z[0.002,0.097]
+         centroid (0.046, 0.147, 0.050).
+         To place mesh at its global position in link frame at q=0:
+            visual_origin = -joint_origin_in_world
+         joint_origin_in_world = (0.046, 0.086, 0.050)
+         ============================================================ -->
+    <link name="${name}_shoulder_link">
+      <visual>
+        <origin xyz="-0.046 -0.086 -0.050" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link1_shoulder_rotation.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <!-- shoulder_connector visual, fixed to shoulder_link (same global pose) -->
+      <visual>
+        <origin xyz="-0.046 -0.086 -0.050" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link2_shoulder_connector.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.030 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.060" length="0.130"/></geometry>
+      </collision>
+      <xacro:placeholder_inertial mass="2.5"/>
+    </link>
+
+    <joint name="${name}_J1" type="revolute">
+      <parent link="${name}_base_link"/>
+      <child  link="${name}_shoulder_link"/>
+      <origin xyz="0.046 0.086 0.050" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-${J1_LIM}" upper="${J1_LIM}"
+             effort="${J_EFF}" velocity="${J_VEL}"/>
+      <dynamics damping="0.10" friction="0.0"/>
+    </joint>
+
+    <!-- ============================================================
+         joint2 + upper_arm_link (link2_elbow_joint.stl) — J2
+         link2_elbow_joint bbox X[0,0.091] Y[0.183,0.353] Z[0.001,0.132]
+         centroid (0.046, 0.265, 0.067). Long axis +Y.
+         J2 axis = X (horizontal pitch, perpendicular to J1 vertical Y).
+         J2 origin chosen at shoulder housing center (start of upper arm):
+            world (0.046, 0.183, 0.067)  =  start of link2 in Y
+         In shoulder_link frame (origin at world (0.046, 0.086, 0.050)):
+            joint2_origin = (0, 0.097, 0.017)
+         visual_origin for upper_arm = -(0.046, 0.183, 0.067)
+         ============================================================ -->
+    <link name="${name}_upper_arm_link">
+      <visual>
+        <origin xyz="-0.046 -0.183 -0.067" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link2_elbow_joint.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.085 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.055" length="0.170"/></geometry>
+      </collision>
+      <xacro:placeholder_inertial mass="2.5"/>
+    </link>
+
+    <joint name="${name}_J2" type="revolute">
+      <parent link="${name}_shoulder_link"/>
+      <child  link="${name}_upper_arm_link"/>
+      <origin xyz="0 0.097 0.017" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="-${J2_LIM}" upper="${J2_LIM}"
+             effort="${J_EFF}" velocity="${J_VEL}"/>
+      <dynamics damping="0.10" friction="0.0"/>
+    </joint>
+
+    <!-- ============================================================
+         joint3 + forearm_link (link3_forearm.stl) — J3
+         link3_forearm bbox X[0,0.086] Y[0.341,0.546] Z[0.001,0.186]
+         centroid (0.042, 0.437, 0.099). long axis +Y, curves in Z.
+         J3 origin at start of forearm (world Y=0.341):
+            world ~= (0.042, 0.341, 0.099)
+         In upper_arm_link frame (origin at world (0.046, 0.183, 0.067)):
+            joint3_origin = (-0.004, 0.158, 0.032)
+         visual_origin for forearm = -(0.042, 0.341, 0.099)
+         ============================================================ -->
+    <link name="${name}_forearm_link">
+      <visual>
+        <origin xyz="-0.042 -0.341 -0.099" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link3_forearm.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <!-- elbow_connector / wrist housing visual fixed at end of forearm
+           (its global bbox is X[0.4,154] Y[504,621] Z[3,84]; it sits at
+           the FAR end of the forearm despite its filename).
+           Visual origin = -(forearm_link origin in world). -->
+      <visual>
+        <origin xyz="-0.042 -0.341 -0.099" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link3_elbow_connector.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.103 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.045" length="0.230"/></geometry>
+      </collision>
+      <xacro:placeholder_inertial mass="2.2"/>
+    </link>
+
+    <joint name="${name}_J3" type="revolute">
+      <parent link="${name}_upper_arm_link"/>
+      <child  link="${name}_forearm_link"/>
+      <origin xyz="-0.004 0.158 0.032" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="-${J3_LIM}" upper="${J3_LIM}"
+             effort="${J_EFF}" velocity="${J_VEL}"/>
+      <dynamics damping="0.10" friction="0.0"/>
+    </joint>
+
+    <!-- ============================================================
+         joint4 + wrist1_link (link4_wrist1_cylinder.stl) — J4
+         link4_wrist1_cylinder bbox X[0.005,0.073] Y[0.520,0.588] Z[0,0.044]
+         centroid (0.036, 0.554, 0.026). Roll along +Y.
+         J4 origin at entry face of wrist1 (world Y=0.520):
+            world ~= (0.036, 0.520, 0.026)
+         In forearm_link frame (origin at world (0.042, 0.341, 0.099)):
+            joint4_origin = (-0.006, 0.179, -0.073)
+         visual_origin for wrist1 = -(0.036, 0.520, 0.026)
+         ============================================================ -->
+    <link name="${name}_wrist1_link">
+      <visual>
+        <origin xyz="-0.036 -0.520 -0.026" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link4_wrist1_cylinder.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.034 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.035" length="0.068"/></geometry>
+      </collision>
+      <xacro:placeholder_inertial mass="0.8"/>
+    </link>
+
+    <joint name="${name}_J4" type="revolute">
+      <parent link="${name}_forearm_link"/>
+      <child  link="${name}_wrist1_link"/>
+      <origin xyz="-0.006 0.179 -0.073" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-${J4_LIM}" upper="${J4_LIM}"
+             effort="${J_EFF}" velocity="${J_VEL}"/>
+      <dynamics damping="0.10" friction="0.0"/>
+    </joint>
+
+    <!-- ============================================================
+         joint5 + wrist2_link (link5_wrist2_body.stl) — J5
+         link5_wrist2_body bbox X[0,0.110] Y[0.503,0.591] Z[0,0.088]
+         centroid (0.052, 0.552, 0.039).
+         J5 axis = X (pitch).
+         J5 origin at wrist2 body center (world (0.052, 0.552, 0.039)):
+         In wrist1_link frame (origin at world (0.036, 0.520, 0.026)):
+            joint5_origin = (0.016, 0.032, 0.013)
+         visual_origin for wrist2 = -(0.052, 0.552, 0.039)
+         ============================================================ -->
+    <link name="${name}_wrist2_link">
+      <visual>
+        <origin xyz="-0.052 -0.552 -0.039" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link5_wrist2_body.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <!-- wrist2_cylinder is a fixed cylindrical sub-feature (axial face);
+           bbox X[0,0.077] Y[0.521,0.597] Z[0,0.113]. -->
+      <visual>
+        <origin xyz="-0.052 -0.552 -0.039" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link5_wrist2_cylinder.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0.005 0.010" rpy="0 0 0"/>
+        <geometry><box size="0.110 0.090 0.115"/></geometry>
+      </collision>
+      <xacro:placeholder_inertial mass="0.7"/>
+    </link>
+
+    <joint name="${name}_J5" type="revolute">
+      <parent link="${name}_wrist1_link"/>
+      <child  link="${name}_wrist2_link"/>
+      <origin xyz="0.016 0.032 0.013" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="-${J5_LIM}" upper="${J5_LIM}"
+             effort="${J_EFF}" velocity="${J_VEL}"/>
+      <dynamics damping="0.10" friction="0.0"/>
+    </joint>
+
+    <!-- ============================================================
+         joint6 + wrist3_link (link6_wrist3_cylinder.stl) — J6
+         link6_wrist3_cylinder bbox X[0.011,0.053] Y[0.522,0.590] Z[0.014,0.082]
+         centroid (0.036, 0.559, 0.046). Cylinder axis +Y.
+         J6 axis = Y (tool roll).
+         J6 origin at wrist3 cylinder center (world (0.036, 0.559, 0.046)):
+         In wrist2_link frame (origin at world (0.052, 0.552, 0.039)):
+            joint6_origin = (-0.016, 0.007, 0.007)
+         visual_origin for wrist3 = -(0.036, 0.559, 0.046)
+         ============================================================ -->
+    <link name="${name}_wrist3_link">
+      <visual>
+        <origin xyz="-0.036 -0.559 -0.046" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link6_wrist3_cylinder.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <visual>
+        <origin xyz="-0.036 -0.559 -0.046" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link6_wrist3_upper_body.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.025" length="0.075"/></geometry>
+      </collision>
+      <xacro:placeholder_inertial mass="0.4"/>
+    </link>
+
+    <joint name="${name}_J6" type="revolute">
+      <parent link="${name}_wrist2_link"/>
+      <child  link="${name}_wrist3_link"/>
+      <origin xyz="-0.016 0.007 0.007" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-${J6_LIM}" upper="${J6_LIM}"
+             effort="${J_EFF}" velocity="${J_VEL}"/>
+      <dynamics damping="0.10" friction="0.0"/>
+    </joint>
+
+    <!-- ============================================================
+         Tool flange (link6_tool_flange.stl) — FIXED to wrist3_link
+         bbox X[0,0.054] Y[0.494,0.566] Z[0,0.069]
+         centroid (0.027, 0.529, 0.033). flange face roughly at Y=0.566
+         (slightly past the end of wrist3 toward +Y? actually centroid lies
+         BACKWARDS slightly; the flange disc face is the +Y side).
+         flange_link frame = at flange centroid in world (0.027, 0.529, 0.033)
+         In wrist3_link frame (origin at world (0.036, 0.559, 0.046)):
+            flange_origin = (-0.009, -0.030, -0.013)
+         visual_origin for flange = -(0.027, 0.529, 0.033)
+         ============================================================ -->
+    <link name="${name}_flange">
+      <visual>
+        <origin xyz="-0.027 -0.529 -0.033" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://lexium_cobot_description/meshes/visual/link6_tool_flange.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="lexium_flange"/>
+      </visual>
+      <xacro:placeholder_inertial mass="0.2"/>
+    </link>
+
+    <joint name="${name}_wrist3_to_flange" type="fixed">
+      <parent link="${name}_wrist3_link"/>
+      <child  link="${name}_flange"/>
+      <origin xyz="-0.009 -0.030 -0.013" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============================================================
+         tool0 — canonical TCP frame.
+         Placed at the END of the flange disc, along the wrist3 +Y axis.
+         The flange centroid is at world (0.027, 0.529, 0.033) and the
+         flange disc face is roughly +Y of it; we put tool0 at the
+         centerline (X aligned to wrist3 axis) just past the flange.
+         tool0 in flange frame = (0, 0.020, 0) -> 20 mm down the +Y of
+         the flange.  rpy keeps frame axes aligned with wrist3 frame.
+         ============================================================ -->
+    <link name="${name}_tool0"/>
+    <joint name="${name}_flange_to_tool0" type="fixed">
+      <parent link="${name}_flange"/>
+      <child  link="${name}_tool0"/>
+      <origin xyz="0 0.020 0" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

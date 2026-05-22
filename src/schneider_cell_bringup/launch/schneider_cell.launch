@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!--
+  schneider_cell.launch  -  V39 BRINGUP (11 paquetes modulares)
+  ===========================================================================
+  V39 retira el nodo publish_cell_markers (labels viejos, ya borrado en
+  V38).  El arg "markers" tambien se elimina; no quedan referencias
+  fantasma a publish_cell_markers.py.
+
+    1. robot_description (xacro expand)
+    2. robot_state_publisher
+    3. core sims:        conveyor_sim + rotary_fixture_sim + vision_sim
+    4. controllers:      robot_controller + gripper_sim
+    5. world model:      object_manager
+    6. visualization:    visualization_node (joint fuser + hoses)
+    7. safe filter:      safe_joint_filter
+    8. orchestrator:     state_manager
+    9. HMI:              hmi_node
+   10. RViz
+
+  Args:
+    rviz   : launch RViz                                       (default true)
+    hmi    : launch HMI window                                 (default true)
+    safe   : launch safe_joint_filter                          (default true)
+-->
+<launch>
+
+  <arg name="model"
+       default="$(find schneider_cell_description)/urdf/schneider_cell.urdf.xacro"/>
+  <arg name="scene_yaml"
+       default="$(find schneider_cell_description)/config/scene_dimensions.yaml"/>
+  <arg name="rviz_config"
+       default="$(find schneider_cell_description)/config/view_cell.rviz"/>
+
+  <arg name="rviz" default="true"/>
+  <arg name="hmi"  default="true"/>
+  <arg name="safe" default="true"/>
+
+  <!-- robot_description -->
+  <param name="robot_description"
+         command="$(find xacro)/xacro --inorder $(arg model)
+                  scene_yaml:=$(arg scene_yaml)"/>
+  <rosparam command="load" file="$(arg scene_yaml)" ns="scene_dimensions"/>
+
+  <!-- robot_state_publisher consumes /joint_states (output of safe filter) -->
+  <node name="robot_state_publisher"
+        pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        output="screen"/>
+
+  <!-- ============ CORE DOMAIN SIMS ============ -->
+  <node name="schneider_conveyor_sim" pkg="schneider_conveyor_sim"
+        type="conveyor_sim_node.py" output="screen"/>
+
+  <node name="schneider_rotary_fixture_sim"
+        pkg="schneider_rotary_fixture_sim"
+        type="rotary_fixture_sim_node.py" output="screen"/>
+
+  <node name="schneider_vision_sim" pkg="schneider_vision_sim"
+        type="vision_sim_node.py" output="screen"/>
+
+  <!-- ============ CONTROLLERS ============ -->
+  <node name="schneider_robot_controller"
+        pkg="schneider_robot_controller"
+        type="robot_controller_node.py" output="screen"/>
+
+  <node name="schneider_gripper_sim" pkg="schneider_gripper_sim"
+        type="gripper_sim_node.py" output="screen"/>
+
+  <!-- ============ WORLD MODEL (CAFI lifecycle) ============ -->
+  <node name="schneider_object_manager"
+        pkg="schneider_object_manager"
+        type="object_manager_node.py" output="screen"/>
+
+  <!-- ============ VISUALIZATION (joint fuser + hoses) ============ -->
+  <node name="schneider_visualization" pkg="schneider_visualization"
+        type="visualization_node.py" output="screen"/>
+
+  <!-- ============ SAFE JOINT FILTER (V18 logic, reused) ============ -->
+  <node if="$(arg safe)"
+        name="safe_joint_filter"
+        pkg="schneider_cell_description"
+        type="safe_joint_filter.py"
+        output="screen"/>
+
+  <!-- If safe filter disabled, relay desired -> joint_states -->
+  <node unless="$(arg safe)"
+        name="joint_states_relay"
+        pkg="topic_tools"
+        type="relay"
+        args="/joint_states_desired /joint_states"
+        output="screen"/>
+
+  <!-- ============ ORCHESTRATOR ============ -->
+  <node name="schneider_state_manager"
+        pkg="schneider_state_manager"
+        type="state_manager_node.py" output="screen"/>
+
+  <!-- ============ HMI ============ -->
+  <node if="$(arg hmi)"
+        name="schneider_hmi" pkg="schneider_hmi"
+        type="hmi_node.py" output="screen"/>
+
+  <!-- ============ RVIZ ============ -->
+  <node if="$(arg rviz)"
+        name="rviz" pkg="rviz" type="rviz"
+        args="-d $(arg rviz_config)"
+        output="screen"/>
+
+</launch>

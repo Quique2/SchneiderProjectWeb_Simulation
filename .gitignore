@@ -1,0 +1,48 @@
+# --- catkin / ROS build artifacts ---
+build/
+devel/
+install/
+logs/
+.catkin_tools/
+.catkin_workspace.lock
+*.bag
+*.bag.active
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- C/C++ build outputs ---
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Claude / agent local config ---
+.claude/
+
+# --- Local environment ---
+.env
+.env.local
+*.local

@@ -1,0 +1,996 @@
+# ============================================================================
+# scene_dimensions.yaml  -  V37 (DXF-driven layout + floor-mounted cobot +
+#                                new disco giratorio STL assembly)
+# ============================================================================
+# V37 supersedes the V19..V36 layout block with a brand-new XY layout
+# imported from /dxf/PlantaSchneiderReal.dxf (the user's real planta).
+# Conversion: DXF is in mm, 1 mm = 0.001 m.  DXF origin (0,0) sits at the
+# south-west corner of the mesa (1620 x 920 mm in DXF).  The mesa was
+# re-anchored in world so its centre still lands at (1.252, 1.049),
+# preserving the V36 world frame.
+#
+# DXF-to-world mapping:   world_x = dxf_x_mm/1000 + 0.442
+#                         world_y = dxf_y_mm/1000 + 0.589
+#
+# Mesa real (UNCHANGED vs V36, just re-confirmed against DXF outer
+# polyline #40 = 1620 x 920 mm rectangle):
+#    length 1.62 m, ancho 0.92 m, top z = 1.00 m, floor at z=0.
+#
+# DXF MTEXT labels parsed (8 labels):
+#    "Conveyor"                            DXF (875.9, 920.0)
+#    "Aceptado"                            DXF (861.0, -19.5)
+#    "Rechazado"                           DXF (571.0, -18.2)
+#    "Estación de control"                 DXF ( -34.6, -191.4)
+#    "Zona de remachado y disco giratorio" DXF (1188.5, 83.6)
+#    "Fixture remache"                     DXF (184.4, 850.6)
+#    "Camara"                              DXF (514.5, 301.5)
+#    "Fixture camara"                      DXF (186.1, 90.6)
+#
+# Key DXF features:
+#    - Outer LWPOLYLINE #40 (1620 x 920 mm) = mesa outline.
+#    - LWPOLYLINE #47 (375 x 150 mm @ center 927.5, 775.7)  = conveyor.
+#    - LWPOLYLINE #41 (500 x 500 mm @ center 250.1, 670.0) +
+#      CIRCLE (r=200 mm @ center 250.1, 670.0)               = disco giratorio.
+#         500x500 matches gearbase STL (530 x 500 mm).
+#         r=200 mm matches disco-1 STL (400 mm diameter).
+#    - LWPOLYLINE #46 (150 x 151 mm @ center 381.5, 215.1)  = fixture camara.
+#    - CIRCLE (r=660 mm @ center 819.7, 383.1)              = cobot reach
+#         envelope (matches L03S reach 626 mm + tool clearance).
+#    - LWPOLYLINE #37 (227 x 182 mm @ center 668.3,  94.7)  = rechazado bin.
+#    - LWPOLYLINE #38 (227 x 172 mm @ center 968.7,  90.0)  = aceptado bin.
+#    - LWPOLYLINE #39 (483 x 254 mm @ center 241.6,-126.7)  = estacion control
+#         (OUTSIDE mesa, south).
+#    - Cluster around (876..952, 200..305) = "Zona de remachado y disco
+#         giratorio" cabin and pneumatic supplies (separate from the
+#         disco giratorio itself, which sits at the upper-left of the
+#         mesa where the 500x500 polyline + r=200 circle live).
+#
+# V37 IMPORTANT CHANGES vs V36:
+#   * Cobot NO LONGER hangs.  It is now floor-mounted with a pedestal
+#     column (height 0.55 m, radius 0.060 m) on cell_floor (z=0).
+#     Mount rotation switched from Rx(-pi/2) (hanging) to Rx(+pi/2)
+#     (standing).  Cobot base anchor at world (0.950, 0.972, 0.0)
+#     with pedestal_top at z=0.550 so the canonical L03S J1 axis at
+#     base_z+0.145 = 0.695 m and tool0 at q=0 at z = 0.550 + 0.468 = 1.018
+#     (well above mesa top 1.000).
+#     The DXF circle r=660 at (819.7, 383.1) describes the reach
+#     envelope, NOT the base point; the base was shifted west to give
+#     comfortable reach to ALL stations after the layout reshuffle.
+#   * Process platform REMOVED.  Cobot reaches mesa-top items directly
+#     from the pedestal, so the V36 elevated steel plate is gone.
+#   * Aluminum cabin SIMPLIFIED.  Cobot does not hang from the cabin so
+#     the top-profile cobot mount is removed.  The cabin frame is kept
+#     as a visual enclosure with no load-bearing role.
+#   * Disco giratorio REBUILT with 15 STLs from disco giratorio.zip.
+#     STL inspection shows Z is already the vertical axis in the
+#     exported meshes (gearbase z=0..3 at the bottom, disco-1 z=78..81
+#     at the top, stands rise z=3..72).  The user's "Y_CAD -> Z_ROS"
+#     directive was honoured by SolidWorks during the STL export
+#     itself; the URDF therefore applies IDENTITY rotation (rpy 0 0 0)
+#     on every disc visual.  Validation: every fixed visual was bbox-
+#     checked to confirm zmin < zmax_stands < zmax_disco.
+#   * Gripper alignment preserved: tool0 -> gripper_mount transform
+#     unchanged from V36 (mount_xyz "0 -0.014 0", mount_rpy
+#     "-1.5707963267948966 0 0", mount_yaw=pi).  SolidWorks 99.5 mm Z
+#     reference -> link -Y mapping intact.
+#
+# V37 final world XY (table-centre frame, all metres, derived from DXF):
+#
+#   plant_table                  (1.252, 1.049)  size 1.620 x 0.920
+#   conveyor_1                   (1.370, 1.365)  size 0.375 x 0.150  long X
+#   disco giratorio (centre)     (0.692, 1.259)  500x500 base, 400 dia disc
+#   rotary load mount  (south)   (0.692, 1.109)  cobot side
+#   rotary rivet mount (north)   (0.692, 1.409)  press side
+#   fixture remache (decorativo) (0.692, 1.259)  collapses into the disc
+#   fixture_camara               (0.824, 0.804)  size 0.150 x 0.151
+#   cognex_camera (body)         (0.824, 0.804)  z = 1.32 (0.32 m above mesa)
+#   aceptado bin                 (1.411, 0.679)  size 0.227 x 0.172
+#   rechazado bin                (1.110, 0.684)  size 0.227 x 0.182
+#   control_station              (0.684, 0.462)  size 0.483 x 0.254
+#                                                (OUTSIDE the mesa, south)
+#   cobot base                   (0.950, 0.972, 0.0)  floor-mounted
+#       pedestal_height 0.550 m  pedestal_radius 0.060 m
+#       mount rotation Rx(+pi/2) (standing, CAD +Y -> world +Z)
+#
+# Heights (z, metres, from cell floor):
+#   floor                        0.000
+#   mesa top                     1.000
+#   conveyor belt top            1.070  (mesa top + 0.070 belt rise)
+#   disco gearbase bottom        1.000  (rests on mesa)
+#   disco gearbase top           1.003
+#   disco stands top             1.072
+#   disco-1 (disc face)          1.078 .. 1.081
+#   disco fixture mount face     1.081
+#   fixture_camara plate top     1.015
+#   bin floor                    1.000  (bin bottom rests on mesa top)
+#   bin top                      1.150
+#   cognex camera body           1.320  (= mesa 1.000 + 0.320)
+#   cobot pedestal top           0.550
+#   cobot J1 axis                0.695  (pedestal_top + canonical 0.145)
+#   cobot tool0 at q=0           1.018  (J1_z + canonical 0.468 - 0.145)
+#                                       ; well above mesa top
+#   ceiling cabin top            2.070  (kept from V36, decorative only)
+#
+# REACH from cobot base (0.950, 0.972) (XY plane):
+#   conveyor PICK    (1.370, 1.365)  d = 0.575  (margin 0.051)
+#   disc LOAD        (0.692, 1.109)  d = 0.292  (margin 0.334)
+#   fixture_camara   (0.824, 0.804)  d = 0.210  (margin 0.416)
+#   aceptado         (1.411, 0.679)  d = 0.546  (margin 0.080)
+#   rechazado        (1.110, 0.684)  d = 0.329  (margin 0.297)
+#
+# All 5 cobot targets within reach radius 0.626 m.  RIVET pos (0.692,
+# 1.409) at d = 0.520 m is also reachable but the cobot does not need
+# it: index 180 brings the riveted CAFI back to LOAD where the cobot
+# picks it.
+# ----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Cell envelope
+# ---------------------------------------------------------------------------
+cell_envelope:
+  source: real_dxf
+  dxf_handle: 5D6
+  ros_center_m: {x: 1.252205, y: 1.049061}
+  ros_size_m:   {size_x: 2.504408, size_y: 2.098121}
+
+floor:
+  source: derived
+  z_source: assumed_at_ground
+  ros_center_m: {x: 1.252205, y: 1.049061}
+  ros_size_m:   {size_x: 2.504408, size_y: 2.098121}
+  thickness_m: 0.005
+  top_z_m: 0.0
+
+# ---------------------------------------------------------------------------
+# Plant table  (V9: lengthened in Y from 1.500 to 1.600 m; centre shifted
+# south 20 mm to 1.150 so the south margin for the bins is larger and the
+# north edge stays clear of the riveting cabin)
+# ---------------------------------------------------------------------------
+plant_table:
+  source: V8_component_v9_lengthened
+  ros_center_m: {x: 1.265000, y: 1.150000}
+  ros_size_m:   {size_x: 2.000, size_y: 1.600}
+  v9_change_note: |
+    V8 had size_y=1.500 centre y=1.130.  V9 keeps the same X but bumps
+    size_y to 1.600 and shifts the centre south by 20 mm so the new
+    bigger bins (0.150 m tall) have a comfortable margin from the south
+    edge (bin south edge at world y=0.391 vs mesa south edge at 0.350,
+    gap 41 mm; vs V8 the gap was only 11 mm).
+  top_z_m: 1.200
+  thickness_m: 0.040
+  leg_section_m: 0.060
+  leg_inset_m: 0.080
+  stretcher_section_m: 0.040
+  footprint_includes:
+    - conveyor_1
+    - suministro_cafi
+    - aceptado
+    - rechazado
+    - riveting_zone (rotary index table + 2 fixtures + cabin)
+    - vision_zone
+    - cognex_camera (column footprint)
+    - cobot (fixed, no rail)
+  footprint_excludes:
+    - control_station (SW of the table)
+    - operator_chair (south of the control station)
+  envelope_check:
+    x_range: [0.265, 2.265]
+    y_range: [0.350, 1.950]
+    cell_envelope_x: [0.000, 2.504]
+    cell_envelope_y: [0.000, 2.098]
+    inside_cell_envelope: true
+    control_station_n_edge_y: 0.330
+    plant_table_s_edge_y: 0.350
+    gap_to_control_station_m: 0.020
+
+# ---------------------------------------------------------------------------
+# Cobot Lexium LXMRL03S0000 (3 kg, reach 626 mm)
+#   V9: cobot is FIXED on the plant table top.  No rail, no prismatic
+#   joint.  In static pose, tool0 lands directly above the LOAD fixture
+#   of the rotary index table at world (1.671, 1.475).
+# ---------------------------------------------------------------------------
+cobot:
+  source: V15_articulated_dynamic_model
+  dxf_handle: 2D6
+  model: Schneider Lexium LXMRL03S0000
+  controller: LXMRL03C1000
+  parent_frame: world
+  ros_base_m: {x: 1.670548, y: 0.920000}
+  ros_base_m_note: |
+    V10: cobot shifted 200 mm SOUTH so its static-pose tool0 reaches the
+    rotary disc LOAD mount (world y=1.275).  V14/V15 keep this base pose
+    byte-for-byte.
+  base_z_m: 1.200
+  base_z_source: directly_on_plant_table_top_no_rail
+  yaw: 1.5707963267948966
+  yaw_source: north_facing_unchanged
+  reach_radius_m: 0.626
+  reach_source: real_dxf_circle_r_matches_LXMRL03S0000_spec
+  pedestal_height_m: 0.25
+  pedestal_radius_m: 0.055
+  pedestal_source: V5_kept_unchanged
+  articulated: true
+  articulated_source: |
+    V15: the cobot is rebuilt as a proper ARTICULATED, DYNAMIC model.
+    V14 had loaded the real Schneider STEP as ONE rigid fused mesh - it
+    looked right but was a static statue.  V15 replaces that with a
+    13-link / 6-revolute-joint chain in lexium_cobot_real.xacro.  The
+    STEP is a single PRODUCT with no separated links, so per-link CAD is
+    not available; V15 therefore RECONSTRUCTS each segment with faithful
+    primitive geometry sized from the real LXMRL03S0000 and the V14 STEP
+    envelope.  The STEP STL is kept in the package as a geometric
+    reference asset (meshes/cobot_lexium_l03s/) but is no longer loaded
+    by the URDF.
+  v15_articulated_model:
+    component_macro: lexium_cobot_real
+    component_file: urdf/components/lexium_cobot_real.xacro
+    links: [base, mount, pedestal, j1, shoulder, upper_arm, elbow,
+            forearm, wrist1, wrist2, wrist3, flange, tool0]
+    revolute_joints:
+      J1: {parent: pedestal,  child: j1,        axis: [0,0,1], origin_xyz: [0,0,0.145],   limit_rad: [-3.1416, 3.1416]}
+      J2: {parent: shoulder,  child: upper_arm, axis: [0,1,0], origin_rpy: [0,-0.9599310885968813,0], limit_rad: [-2.0944, 2.0944]}
+      J3: {parent: elbow,     child: forearm,   axis: [0,1,0], origin_rpy: [0, 0.9599310885968813,0], limit_rad: [-2.6180, 2.6180]}
+      J4: {parent: forearm,   child: wrist1,    axis: [1,0,0], origin_xyz: [0.215,0,0],   limit_rad: [-6.2832, 6.2832]}
+      J5: {parent: wrist1,    child: wrist2,    axis: [0,1,0], origin_rpy: [0, 1.5707963267948966,0], limit_rad: [-2.0944, 2.0944]}
+      J6: {parent: wrist2,    child: wrist3,    axis: [1,0,0], origin_xyz: [0.035,0,0],   limit_rad: [-6.2832, 6.2832]}
+    joint_dynamics: {effort: 56.0, velocity: 3.1416, damping: 0.10, friction: 0.0}
+    kinematics_note: |
+      EVERY joint origin is byte-for-byte the transform the V5..V14
+      proxy chain used (extracted by FK from the expanded V13 URDF).
+      The 6 joints were simply promoted from `fixed` to `revolute`.  So
+      with all joints at q=0 - the value joint_state_publisher publishes
+      by default, since 0 is inside every limit - the kinematics are
+      IDENTICAL to V13/V14:
+        base->tool0 xyz = 0.355526227 0 0.468192251
+        base->tool0 rpy = 3.141592654 0 3.141592654
+        world tool0     = (1.670548, 1.275526, 1.668193) rpy (pi,0,-pi/2)
+      verified by FK on the expanded V15 URDF (error 0.0008 mm).  The
+      cobot is NOT moved, the reach is unchanged, new_gripper does not
+      move.  Launch with gui:=true for the J1..J6 sliders.
+    geometry: |
+      white tubular links + dark cylindrical joint-module drums +
+      Schneider-green accent rings, sized from the LXMRL03S0000 and the
+      STEP envelope - reads as a Lexium, not as the old V5 stick proxy
+      and not as a single rigid block.
+  reference_asset:
+    step: planta Schneider/03_modelo_step_cobot/Lexium_Cobot_L03S_3D-simpl.STEP
+    mesh_kept: package://schneider_cell_description/meshes/cobot_lexium_l03s/lexium_l03s.STL
+    role: geometric reference only - NOT loaded by the URDF since V15
+  proxy_replaced:
+    old_component: urdf/components/lexium_cobot.xacro  (V5 primitive proxy, DEPRECATED, kept on disk for history)
+    history: |
+      V5..V13 = primitive proxy (lexium_cobot.xacro).  V14 = real STEP
+      loaded as one rigid static mesh (lexium_cobot_real.xacro).  V15 =
+      articulated reconstruction (lexium_cobot_real.xacro rewritten).
+
+# ---------------------------------------------------------------------------
+# Conveyors (top z = 1.265 m, sitting on the plant table)
+# ---------------------------------------------------------------------------
+conveyor_1:
+  source: real_dxf
+  dxf_handle: '516'
+  ros_center_m: {x: 1.068881, y: 0.860821}
+  ros_size_m:   {size_x: 0.700, size_y: 0.150}
+  long_axis: x
+  body_height_m: 0.065
+  top_z_m: 1.265
+  support_z_m: 1.200
+  z_source: belt_top_lifted_to_mesa_plus_65mm_v8
+
+# Conveyor 2 was removed in V7 and STAYS REMOVED in V9.  Its DXF footprint
+# (handle '564', 0.150 x 0.700 m at center (2.063430, 0.585821)) is still
+# occupied by the vision_zone workstation.
+
+# ---------------------------------------------------------------------------
+# CAFI supply station (low pallet on the plant table)
+# ---------------------------------------------------------------------------
+suministro_cafi:
+  source: real_dxf
+  dxf_handle: '517'
+  ros_center_m: {x: 0.538929, y: 0.860821}
+  ros_size_m:   {size_x: 0.359903, size_y: 0.684717}
+  cabinet_height_m: 0.015
+  cabinet_top_z_m: 1.215
+  cabinet_bottom_z_m: 1.200
+
+# ---------------------------------------------------------------------------
+# Quality bins  (V9: HOLLOW boxes, open-top, bottom + 4 walls)
+# ---------------------------------------------------------------------------
+aceptado:
+  source: real_dxf
+  dxf_handle: 5C5
+  ros_center_m: {x: 1.786151, y: 0.496006}
+  ros_size_m:   {size_x: 0.226837, size_y: 0.210517}
+  height_m: 0.150
+  wall_thickness_m: 0.005
+  bottom_z_m: 1.200
+  top_z_m: 1.350
+  form: hollow_open_top_box
+  color: green_tote_walls
+
+rechazado:
+  source: real_dxf
+  dxf_handle: 5BD
+  ros_center_m: {x: 1.485667, y: 0.496006}
+  ros_size_m:   {size_x: 0.226837, size_y: 0.210517}
+  height_m: 0.150
+  wall_thickness_m: 0.005
+  bottom_z_m: 1.200
+  top_z_m: 1.350
+  form: hollow_open_top_box
+  color: red_tote_walls
+
+# ---------------------------------------------------------------------------
+# Riveting zone  (V9: anchor frame on the mesa surface, same as V8.
+#                 Press now hangs over the NORTH rivet mount of the rotary
+#                 index table, not over the zone centre)
+# ---------------------------------------------------------------------------
+riveting_zone:
+  source: V8_anchor_frame_v10_press_restored
+  dxf_handle: 50F
+  ros_center_m: {x: 1.670548, y: 1.475347}
+  ros_size_m:   {size_x: 1.000, size_y: 0.700}
+  anchor_z_m: 1.200
+  v10_form: empty_anchor_link_no_visual
+  riveting_cabin_module:
+    cabin_size_m: {size_x: 0.700, size_y: 0.400}
+    cabin_height_m: 0.500
+    cabin_y_offset_in_zone_m: 0.150
+    cabin_y_offset_note: pushed_NORTH_back_of_work_zone_v8_unchanged
+    canopy:
+      thickness_m: 0.040
+      top_z_local_m: 0.500
+      top_z_world_m: 1.700
+    press_offset_in_zone_m: [0.0, 0.000]
+    press_offset_note: |
+      V10: press_offset_y RESTORED to V8 value 0.000.  Press hangs over
+      zone CENTRE = world (1.671, 1.475) = V10 RIVET mount of the
+      rotary disc.  Tip bottom at z_local=0.130 (world 1.330), ~80 mm
+      above the CAFI top (world z=1.250) when a loaded CAFI is brought
+      to the RIVET mount.
+
+# ---------------------------------------------------------------------------
+# Rotary index table  (V9 NEW)
+# ---------------------------------------------------------------------------
+rotary_index_table:
+  source: V9_component_v10_repositioned_smaller
+  parent_frame: riveting_zone
+  disc_ros_center_local_m: {x: 0.000, y: -0.100}
+  disc_ros_center_world_m: {x: 1.670548, y: 1.375347}
+  disc_top_z_world_m: 1.220
+  disc_thickness_m: 0.020
+  disc_radius_m: 0.100
+  mount_radius_m: 0.100
+  load_mount_world_m: {x: 1.670548, y: 1.275347, z: 1.220}
+  load_mount_position: OUTSIDE_cabin_south_of_cabin_south_face
+  rivet_mount_world_m: {x: 1.670548, y: 1.475347, z: 1.220}
+  rivet_mount_position: INSIDE_cabin_at_zone_centre_under_press
+  cabin_south_face_world_y: 1.425
+  load_clearance_to_cabin_s_m: 0.150
+  rivet_clearance_to_cabin_s_m: 0.050
+  v10_change_note: |
+    V9 had disc centre at zone (0, +0.150) and radius 0.150, putting
+    BOTH mounts INSIDE the cabin (V9 LOAD at y=1.475, RIVET at y=1.775,
+    both north of the cabin south face).  V10 shifts the disc south
+    by 0.250 m (centre to zone (0, -0.100)) and shrinks the radius to
+    0.100 m so:
+      - LOAD mount is now at world y=1.275, 150 mm SOUTH of the cabin
+        south face (y=1.425) - fully OUTSIDE the cabin, accessible to
+        the cobot.
+      - RIVET mount is now at world y=1.475 (zone centre), under the
+        V8 press (which is also at zone centre).
+  flow:
+    step_1: cobot picks/places a CAFI on the LOAD fixture (south of cabin, world y=1.275)
+    step_2: disc rotates 180 deg around its centre at world (1.671, 1.375)
+    step_3: the loaded CAFI lands on the RIVET fixture (inside cabin, world y=1.475) directly under the press head
+
+fixture_load:
+  source: assumed_rivet_fixture_on_load_mount_v11
+  parent_frame: rotary_table_load_mount
+  ros_center_world_m: {x: 1.670548, y: 1.275347}
+  base_z_m: 0.000
+  yaw: 3.141592653589793
+  yaw_source_v11: |
+    V11: pre-rotated by pi so that, after the disc indexes 180 deg to
+    swap LOAD <-> RIVET, the fixture arrives at the press at world yaw
+    = pi + pi = 2*pi = 0 (= fixture_rivet_pos's canonical orientation).
+    Visual consequence: at the LOAD station the fixture appears INVERTED
+    relative to fixture_rivet_pos.  This is correct - it is the price
+    of the 180-deg index.  The cobot does not care about LOAD-side
+    orientation; what matters is the CAFI lands correctly under the
+    press, which V11 guarantees.
+  visual_rpy: [1.5707963267948966, 0.0, 0.0]
+  mesh: package://schneider_cell_description/meshes/fixtures/Fixture_para_remache_1.STL
+  mesh_scale: [0.001, 0.001, 0.001]
+  bottom_z_world_m: 1.220
+  top_z_world_m: 1.250
+  function: load_fixture_for_cobot_to_place_CAFI_outside_cabin
+  world_yaw_at_load_position: 3.141592653589793
+  world_yaw_after_180deg_disc_index: 0.0
+
+cafi_load:
+  source: real_stl_nested_in_fixture_load
+  parent_frame: fixture_load
+  z_offset_above_fixture_m: 0.005
+  visual_rpy: [1.5707963267948966, 0.0, 0.0]
+  mesh: package://schneider_cell_description/meshes/cafi/cafi.STL
+  mesh_scale: [0.001, 0.001, 0.001]
+  ros_center_world_m: {x: 1.670548, y: 1.275347}
+  base_z_world_m: 1.225
+  top_z_world_m: 1.250
+  inherits_fixture_yaw: true
+  world_yaw_at_load_position: 3.141592653589793
+  world_yaw_after_180deg_disc_index: 0.0
+  v11_note: |
+    CAFI inherits fixture_load's yaw (joint to parent has rpy=0).  So
+    when fixture_load is pre-rotated by pi, the CAFI is also at world
+    yaw = pi at the LOAD station, and at world yaw = 0 (correct) after
+    the 180-deg disc index brings it to the RIVET station.
+
+fixture_rivet_pos:
+  source: assumed_rivet_fixture_on_rivet_mount_v10
+  parent_frame: rotary_table_rivet_mount
+  ros_center_world_m: {x: 1.670548, y: 1.475347}
+  base_z_m: 0.000
+  yaw: 0.0
+  yaw_source: canonical_correct_orientation_under_press_v10_v11
+  visual_rpy: [1.5707963267948966, 0.0, 0.0]
+  mesh: package://schneider_cell_description/meshes/fixtures/Fixture_para_remache_1.STL
+  mesh_scale: [0.001, 0.001, 0.001]
+  bottom_z_world_m: 1.220
+  top_z_world_m: 1.250
+  function: rivet_fixture_inside_cabin_under_press_head
+  world_yaw_at_rivet_position: 0.0
+  world_yaw_after_180deg_disc_index: 3.141592653589793
+
+# ---------------------------------------------------------------------------
+# Vision (camera inspection) workstation  -  V13 IN COBOT REACH
+# ---------------------------------------------------------------------------
+vision_zone:
+  source: V13_moved_into_cobot_reach
+  ros_center_m: {x: 2.050000, y: 1.200000}
+  ros_center_source_v13: |
+    V12 placed vision_zone at (2.150, 1.475) which was 0.733 m from
+    the cobot base - OUT of the 0.626 m reach by 107 mm.  V13 moves
+    it to (2.050, 1.200): distance from cobot base (1.671, 0.920) =
+    sqrt(0.379^2 + 0.280^2) = 0.4712 m, well INSIDE the reach with
+    155 mm slack.  Still on the east strip of the mesa, clear of the
+    riveting cabin (south of cabin south face 1.425) and bins.
+  ros_size_m:   {size_x: 0.220, size_y: 0.220}
+  table_thickness_m: 0.015
+  table_top_z_m: 1.215
+  support_z_m: 1.200
+  leg_radius_m: 0.010
+  leg_inset_m: 0.040
+  leg_length_m: 0.000
+  cobot_reach_check_v13:
+    cobot_base_m: {x: 1.671, y: 0.920}
+    distance_to_fixture_m: 0.4712
+    reach_radius_m: 0.626
+    in_reach: true
+    margin_m: 0.1548
+  collision_check_v13:
+    vision_plate_x_range: [1.940, 2.160]
+    vision_plate_y_range: [1.090, 1.310]
+    mesa_x_range: [0.265, 2.265]
+    mesa_y_range: [0.350, 1.950]
+    disc_x_range: [1.571, 1.771]
+    disc_y_range: [1.275, 1.475]
+    cabin_x_range: [1.321, 2.021]
+    cabin_y_range: [1.425, 1.825]
+    bins_y_range: [0.391, 0.601]
+    plate_inside_mesa: true
+    plate_overlaps_disc_xy: false   # (disc east edge 1.771 < plate west 1.940)
+    plate_south_of_cabin: true
+    plate_north_of_bins: true
+
+fixture_2:
+  source: V12_NEW_STL_v13_moved
+  parent_frame: vision_zone
+  ros_center_m: {x: 2.050000, y: 1.200000}
+  base_z_m: 0.0075
+  yaw: 0.0
+  visual_rpy: [1.5707963267948966, 0.0, 0.0]
+  mesh: package://schneider_cell_description/meshes/fixtures/Fixture_para_camara_final.STL
+  mesh_source_v12: |
+    User-supplied STL "Fixture para camara final.STL" copied into the
+    package as "Fixture_para_camara_final.STL" (spaces replaced for
+    ROS compatibility).  The previous "Fixture_para_camara.STL"
+    (V6..V11) has been REMOVED from the package.
+  stl_bbox:
+    min_mm: [0.0, 0.0, 0.0]
+    max_mm: [158.6580, 15.0000, 117.9000]
+    size_mm: [158.6580, 15.0000, 117.9000]
+  stl_bbox_v12_delta_vs_old:
+    length_x_mm: +10.000  # 148.660 -> 158.658
+    thickness_y_mm: +5.000  # 10.000 -> 15.000
+    depth_z_mm: +10.000  # 107.900 -> 117.900
+  visual_origin_offset_m: {x: -0.079329, y: 0.058950, z: 0.000000}
+  visual_origin_offset_source_v12: bbox_centered_xy_after_rx_pi_over_2_rotation_recomputed_for_new_bbox
+  mesh_scale: [0.001, 0.001, 0.001]
+  bottom_z_world_m: 1.215
+  top_z_world_m: 1.230
+  top_z_v12_note: |
+    Fixture top z is 1.230 (was 1.225 with the old 10 mm fixture); the
+    new fixture is 5 mm thicker.
+
+cafi_vision:
+  source: V12_logic_v13_moved
+  parent_frame: fixture_2
+  z_offset_above_fixture_m: 0.000
+  visual_rpy: [1.5707963267948966, 0.0, 0.0]
+  mesh: package://schneider_cell_description/meshes/cafi/cafi.STL
+  mesh_scale: [0.001, 0.001, 0.001]
+  ros_center_world_m: {x: 2.050000, y: 1.200000}
+  base_z_world_m: 1.215
+  top_z_world_m: 1.240
+  v13_note: |
+    CAFI still nests INTO the 15 mm saddle (z_offset=0).  Only XY
+    moved with the parent vision_zone.  Top z = 1.240 unchanged.
+
+# ---------------------------------------------------------------------------
+# Cognex In-Sight 2800  (V13 LATERAL east-side floor-mounted bracket)
+# ---------------------------------------------------------------------------
+cognex_camera:
+  source: V13_lateral_floor_bracket
+  footprint_dxf_handle_v8: '589'
+  ros_center_m: {x: 2.210000, y: 1.200000}
+  ros_center_source_v13: |
+    Camera body anchor moved from V12's (2.150, 1.692) to (2.210, 1.200).
+    Body is 0.160 m east of the new fixture (2.050, 1.200), at the
+    same Y, looking west.  The 0.120 m horizontal arm from the column
+    places the body west of the column, hovering above the mesa east
+    strip at z=1.750.
+  z_m: 1.750
+  aim_target_m: {x: 2.050000, y: 1.200000, z: 1.240}
+  aim_target_source_v13: vision_cafi_top_centre_at_new_xy
+  yaw_to_target: 3.141593
+  yaw_to_target_source_v13: pi_anchor_X_points_west_toward_fixture
+  pitch_to_target: 1.266795
+  pitch_source_v13: atan2(0.510, 0.160) = 1.266795 rad (72.58 deg)
+  body_size_m: {x: 0.060, y: 0.045, z: 0.045}
+  lens_radius_m: 0.014
+  lens_length_m: 0.028
+  bracket:
+    column_radius_m: 0.018
+    column_top_z_m: 1.800
+    column_bottom_z_m: 0.000
+    column_bottom_z_source_v13: floor_mounted_NOT_mesa_mounted
+    column_length_m: 1.800
+    arm_length_m: 0.12
+  column_world_xy_m_v13: {x: 2.330, y: 1.200}
+  column_world_xy_note_v13: |
+    With anchor yaw = pi and arm_length = 0.12, the column joint
+    origin (-arm_length, 0, z) in the anchor frame maps to a world X
+    offset of +arm_length = +0.120.  Column world XY = (2.330, 1.200).
+    Mesa east edge 2.265 -> column is 65 mm EAST of the mesa edge,
+    OUTSIDE the mesa footprint, anchored to the floor.  Column lives
+    in the "right-side bracket" zone the user requested
+    (x ~ 2.28..2.33, y ~ 1.20..1.30).
+  body_world_xyz_m: {x: 2.210, y: 1.200, z: 1.750}
+  body_world_xyz_note_v13: |
+    Camera body is 55 mm WEST of the mesa east edge (inside mesa
+    footprint in X), 0.082 m ABOVE the cobot's static tool0 z=1.668;
+    so vertical separation prevents collision when the cobot reaches
+    into the fixture area.
+  cobot_clearance_v13:
+    cobot_base_world_m: {x: 1.671, y: 0.920}
+    cobot_reach_radius_m: 0.626
+    distance_to_fixture_m: 0.4712
+    distance_to_camera_body_m: 0.6074
+    distance_to_column_m: 0.7160
+    fixture_in_reach: true
+    fixture_margin_m: 0.1548
+    column_out_of_reach: true
+    column_margin_m: 0.0900
+    note: |
+      The FIXTURE is reachable by the cobot (0.471 m, 155 mm margin).
+      The COLUMN is outside the reach (0.716 m, 90 mm beyond).  The
+      camera body is technically 0.607 m horizontally from the cobot
+      (just inside the reach radius) but is 82 mm ABOVE the cobot's
+      static tool0 z = 1.668 m, so the cobot's gripper (which hangs
+      below tool0) cannot physically contact it when picking from the
+      fixture.  When extending to the fixture XY, the cobot's wrist
+      + tool0 stack drops to tool0 z, leaving the camera body above
+      it.
+
+# ---------------------------------------------------------------------------
+# Gripper (V9: REPLACED with new_gripper, V7/V8 gripper_schneider REMOVED)
+# ---------------------------------------------------------------------------
+gripper:
+  source: V9_new_gripper_user_assembly
+  source_files:
+    sldasm: C:\Users\santi\Downloads\new_gripper\new_gripper.SLDASM
+    parts:
+      - new_gripper_stump.SLDPRT     # mounting plate (mesh +Y face = TCP)
+      - new_gripper_neck.SLDPRT      # transition block
+      - new_gripper_appendage.SLDPRT # extension arm
+      - new_gripper_fixture.SLDPRT   # main jaw / housing (170 mm long)
+      - new_gripper_fixture1.SLDPRT  # opposing jaw / housing
+  export_method: SolidWorks_COM_API_via_pywin32_SaveAs3_binary_STL_mm
+  meshes_in_package: package://schneider_cell_description/meshes/gripper_new/
+  parent_frame: lexium_cobot_tool0
+  mount_rpy: [-1.5707963267948966, 0.0, 0.0]
+  mount_rpy_note: |
+    Rx(-pi/2):  R*(a,b,c) = (a, c, -b).  Maps mesh +Y (mount face direction)
+    to link -Z, and mesh -Y (body extension direction) to link +Z.  Link
+    +Z is tool0 +Z = world -Z, so the body extension hangs straight DOWN
+    in world.  Jaws point downward.
+  mount_yaw: 3.141592653589793
+  mount_yaw_source_v15: |
+    V15: mount_yaw = pi is applied to the lexium_cobot_tool0 -> gripper_base
+    JOINT origin (rpy 0 0 pi), NOT to the mesh visuals.  It rotates the
+    whole gripper 180 deg about the TCP vertical axis (a yaw in the XY
+    plane).  The rotation axis is tool0 Z, which points world -Z, so the
+    jaws still point straight DOWN and the gripper base stays bolted to
+    lexium_cobot_tool0.  FK check: gripper_base world rpy goes from
+    V14 (pi,0,-pi/2) to V15 (pi,0,+pi/2) - X/Y axes flipped, Z unchanged.
+    The 5 mesh visuals and their visual_origin_offset are NOT touched.
+  visual_origin_offset_m: {x: -0.172000, y: -0.085000, z: 0.083000}
+  visual_origin_offset_source: |
+    Mount-face centre in mesh = (mid_x=172, +Y_face=83, mid_z=85) mm.
+    For (172,83,85) to land on link (0,0,0) under Rx(-pi/2):
+      R*(172,83,85) = (172, 85, -83);  xyz = -R*(.) = (-172, -85, +83) mm.
+    Sanity: body-bottom mesh (172, 0, 85) -> R*(.)=(172, 85, 0) + xyz
+            = (0, 0, +83) mm  =>  body bottom at link z=+0.083 m
+            =>  world z = tool0_z - 0.083 (since tool0 +Z = world -Z).
+            =>  body hangs 83 mm BELOW tool0 in world.
+  mesh_bboxes_mm:
+    stump:     {x: [140.21, 204.21], y: [ 77.27, 83.27], z: [ 39.16, 103.14]}
+    neck:      {x: [162.46, 182.21], y: [ 43.77, 73.52], z: [100.65, 121.40]}
+    appendage: {x: [162.71, 182.21], y: [  3.52, 68.27], z: [121.40, 141.40]}
+    fixture:   {x: [162.21, 187.21], y: [  0.27, 77.27], z: [  0.65, 170.65]}
+    fixture1:  {x: [157.21, 162.21], y: [ 40.27, 77.27], z: [  0.65, 170.65]}
+  mesh_scale: [0.001, 0.001, 0.001]
+  lowest_world_z_m: 1.5855
+  removed_in_v9:
+    - gripper_schneider.xacro
+    - meshes/gripper/*.STL (12 old gripper meshes)
+
+# ---------------------------------------------------------------------------
+# Control station  (V9: moved to SW corner of the cell, OUTSIDE the mesa)
+# ---------------------------------------------------------------------------
+control_station:
+  source: V8_geometry_xy_sw_in_v9_desk_80cm_in_v14
+  form: workbench_with_back_panel_and_under_desk_shelf
+  ros_center_m: {x: 0.450000, y: 0.180000}
+  ros_center_source: moved_to_SW_in_V9_unchanged_since_v10_xy_NOT_changed_in_v14
+  ros_size_m:   {width_m: 0.500, depth_m: 0.300, height_m: 1.200}
+  desk_top_z_m: 0.800
+  desk_top_z_source: V14_corrected_to_0.800m_per_brief_was_0.720_in_v10
+  desk_top_z_v14_note: |
+    The operation / HMI table is corrected to 0.80 m.  Every derived
+    height in control_station.xacro follows the single desk_top_z
+    property and rescales automatically: the 4 legs (length 0.800),
+    the worktop, the lower shelf, the back panel, the Modicon M262 PLC,
+    the Harmony ST6 HMI, the monitor + stand, the mini-PC, the e-stop,
+    the selector switch, the Lexium controller and the valance.  XY of
+    the control station is NOT changed.
+  back_panel_height_m: 0.400
+  back_panel_height_source: V14_derived_from_height_1.200_minus_desk_top_z_0.800
+  yaw: 0.0
+  yaw_source: back_panel_faces_north_operator_at_south
+  collision_check_v9:
+    control_station_x_range: [0.200, 0.700]
+    control_station_y_range: [0.030, 0.330]
+    plant_table_x_range: [0.265, 2.265]
+    plant_table_y_range: [0.350, 1.950]
+    overlap_x: '[0.265, 0.700]'
+    overlap_y: 'none (control n=0.330 < plant table s=0.350, gap 20 mm)'
+    bin_x_overlap: 'none'
+    cobot_pedestal: 'clear (cobot at x=1.671, far east)'
+    cognex_column: 'clear'
+    cell_envelope: 'control station fully inside cell envelope'
+
+# ---------------------------------------------------------------------------
+# Operator chair  (V9 NEW)
+# ---------------------------------------------------------------------------
+operator_chair:
+  source: V9_component_v14_seat_raised
+  parent_frame: world
+  ros_seat_center_m: {x: 0.345, y: -0.150}
+  ros_seat_center_source: |
+    X aligned with the monitor on the control-station worktop
+    (control_station.ros_center_m.x - 0.105 = 0.345).
+    Y pushed south of the bench so the seat clears the bench front
+    legs (at world y=0.050).  XY NOT changed in V14.
+  seat_size_m: {x: 0.400, y: 0.300, z: 0.040}
+  seat_top_z_m: 0.500
+  seat_top_z_source: V14_raised_from_0.430_to_0.500_to_match_the_corrected_0.800m_desk
+  seat_top_z_v14_note: |
+    Seat raised to 0.500 m (inside the brief's 0.48-0.52 m range) so the
+    ~0.30 m seat-to-desk gap stays ergonomic against the new 0.80 m
+    desk.  backrest_height (0.400) is unchanged at the callsite, so the
+    backrest top rises with the seat to 0.900 m.  The 4 legs derive
+    their length from seat_top_z (0.500 - 0.040 = 0.460 m).
+  backrest:
+    size_m: {x: 0.400, y: 0.040, z: 0.400}
+    side: south_of_seat_facing_north
+    top_z_m: 0.900
+  legs:
+    count: 4
+    radius_m: 0.018
+    length_m: 0.460
+  note: |
+    The chair sits south of the bench within the cell envelope; the
+    seat south edge at y=-0.300 extends slightly past the cell south
+    edge (y=0.000) by 300 mm.  This is a visual overflow only - the
+    chair represents the operator's position in front of the monitor.
+
+# ===========================================================================
+# V14  SENSORS  -  3x SICK GRTE18S-P2312 photoelectric presence sensors
+# ---------------------------------------------------------------------------
+# Real CAD: user-supplied STEP "Sensor fotoelétrico SICK GRTE18S-P2312.STEP"
+# converted with gmsh (OpenCASCADE) to a binary STL.  Mesh bbox 18 x 38.1 x
+# 18 mm (M18 barrel sensor, optical face at mesh Y=0).  Component macro:
+# urdf/components/photoelectric_sensor_sick_grte18s_p2312.xacro - the sensor
+# LINK's local +X is the optical beam; bracket = clamp + arm + post + foot.
+# ===========================================================================
+sensors:
+  mesh: package://schneider_cell_description/meshes/sensors/sick_grte18s_p2312/sick_grte18s_p2312.STL
+  mesh_scale: [0.001, 0.001, 0.001]
+  model: SICK GRTE18S-P2312
+  source_step: planta Schneider/Sensor fotoelétrico SICK GRTE18S-P2312.STEP
+  conversion: gmsh 4.15.2 (OpenCASCADE), STEP -> binary STL (mm)
+  mesh_bbox_mm: {x: [-9.0, 9.0], y: [0.0, 38.1], z: [-9.0, 9.0]}
+
+  sensor_conveyor_end:
+    function: detects a CAFI that has reached the pick end of Conveyor 1
+    optical_face_world_m: {x: 1.400, y: 0.760, z: 1.300}
+    beam_yaw: 1.5707963267948966          # link +X = world +Y (north, across the belt)
+    beam_pitch: 0.0
+    beam_len_m: 0.200
+    mount: bracket SOUTH of the belt, beam transverse NORTH across it
+    bracket_foot_world_m: {x: 1.400, y: 0.682, z: 1.200}
+    monitored_target: Conveyor 1 pick end (belt top z=1.265, end X=1.419)
+    future_plc_signal: DI_sensor_conveyor_end
+
+  sensor_rotary_load_fixture:
+    function: detects piece presence on the EXTERNAL load fixture of the rotary disc
+    optical_face_world_m: {x: 1.560, y: 1.275, z: 1.238}
+    beam_yaw: 0.0                          # link +X = world +X (east, toward the CAFI)
+    beam_pitch: 0.0
+    beam_len_m: 0.140
+    mount: bracket WEST of the load fixture, beam horizontal EAST - detects from the SIDE
+    bracket_foot_world_m: {x: 1.482, y: 1.275, z: 1.200}
+    monitored_target: rotary load fixture CAFI (base z=1.225, top z=1.250) at world (1.671, 1.275)
+    clearance_note: west side keeps it clear of the new_gripper and the cobot's south-side approach
+    future_plc_signal: DI_sensor_rotary_load_piece_present
+
+  sensor_vision_piece_present:
+    function: confirms a CAFI is present on the vision fixture before the Cognex inspects
+    optical_face_world_m: {x: 2.050, y: 1.340, z: 1.228}     # V16: was (2.050, 1.110, 1.228) - moved to NORTH side
+    beam_yaw: -1.5707963267948966           # V16: link +X = world -Y (south, toward the CAFI) - was +pi/2
+    beam_pitch: 0.0
+    beam_len_m: 0.180                                          # V16: was 0.160
+    mount: bracket NORTH of the vision plate, beam transverse SOUTH    # V16: was south-side
+    bracket_foot_world_m: {x: 2.050, y: 1.418, z: 1.204}     # V16: bracket foot now north of vision_zone
+    monitored_target: vision fixture CAFI (base z=1.215, top z=1.240) at world (2.050, 1.200)
+    clearance_note: |
+      V16: moved to the NORTH side of the vision fixture because the
+      old SOUTH-side mount had the fixture directly in front of the beam.
+      North side keeps the beam clear of the fixture body; bracket sits
+      on the plant table north of the vision_zone table; no clash with
+      the Cognex aim ray (in the Y=1.200 vertical plane) or with the
+      cobot's approach to the fixture from the west/SW.  The V13 vision
+      station (fixture, Cognex body, column) is NOT moved.
+    future_plc_signal: DI_sensor_vision_piece_present
+
+# ===========================================================================
+# V14  ACTUATORS
+# ===========================================================================
+conveyor_drive_motor:
+  source: V14_credible_industrial_proxy
+  function: drives the Conveyor 1 belt (visual representation of the actuation)
+  parent_frame: world
+  ros_anchor_world_m: {x: 0.769000, y: 0.786000, z: 1.236000}   # origin = output-shaft tip
+  axis_yaw: 1.5707963267948966   # local +X (output shaft) -> world +Y, couples into the end roller
+  mount: drag (X-min) end of Conveyor 1, just south of the belt, at roller height
+  anatomy: output shaft + coupling + gearbox housing + motor can + fan cover + terminal box + mesa foot
+  cad_search_note: |
+    Searched GrabCAD, TraceParts, 3DContentCentral, 3Dfindit and
+    Mitsubishi-FA for a downloadable conveyor gear-motor STEP.  All
+    usable hits are behind account logins / interactive catalog
+    exporters and could not be fetched + converted head-less here, so
+    this is a credible PROXY shaped like a real inline gear-motor.
+  component_file: urdf/components/conveyor_motor.xacro
+  future_plc_signal: DO_conveyor_motor_run
+
+rotary_table_drive:
+  source: V14_nema17_real_cad_plus_planetary_gearbox_proxy
+  function: indexes the riveting rotary disc (2-position 180-deg index)
+  parent_frame: world
+  ros_anchor_world_m: {x: 1.670548, y: 1.375347, z: 1.160}   # disc-centre XY at the mesa underside
+  mount: UNDER the plant table, directly below the rotary disc centre; output shaft rises through the mesa to the disc hub
+  mesa_bottom_z_m: 1.160
+  disc_bottom_z_m: 1.200
+  nema17:
+    source: V14_real_cad
+    model: NEMA 17 stepper motor
+    source_step: planta Schneider/NEMA 17 Motor.step
+    conversion: gmsh 4.15.2 (OpenCASCADE), STEP -> binary STL (mm)
+    mesh: package://schneider_cell_description/meshes/actuators/nema17/nema17.STL
+    mesh_scale: [0.001, 0.001, 0.001]
+    mesh_bbox_mm: {x: [-21.15, 21.15], y: [-20.0, 44.0], z: [-21.15, 26.65]}
+    mesh_axis_in_step: +Y   # 42.3 mm square body, 5 mm output shaft
+    mesh_visual_rpy: [1.5707963267948966, 0.0, 0.0]   # Rx(pi/2) stands the motor up, shaft -> world +Z
+    body_world_z_range_m: [1.054, 1.098]
+  planetary_gear:
+    source: V14_proxy
+    function: planetary reducer coupling the NEMA 17 to the disc
+    housing_diameter_m: 0.044
+    body_world_z_range_m: [1.104, 1.152]
+    cad_search_note: |
+      Searched GrabCAD, TraceParts, Thingiverse (jjrobots 1:5),
+      Printables and Lin Engineering for a NEMA 17 planetary gearbox
+      STEP.  Usable hits are STL-only or behind logins and could not be
+      fetched + converted head-less here, so this is a credible
+      NEMA 17-compatible PROXY (housing, output flange, mounting flange).
+  output_shaft_world_z_range_m: [1.140, 1.200]
+  component_file: urdf/components/rotary_drive_nema17_planetary.xacro
+  future_plc_signal: DO_rotary_table_motor_index
+
+# ===========================================================================
+# V14  PNEUMATICS
+# ===========================================================================
+gripper_pneumatics:
+  source: V15_integrated_on_real_gripper_ports
+  parent_frame: gripper_base
+  parent_frame_source_v15: |
+    V14 parented this off lexium_cobot_tool0 at hand-guessed offsets, so
+    the cylinder floated OUTSIDE the gripper and the inlets were not on
+    any real port.  V15 re-parents it to `gripper_base` (the gripper
+    link itself) so it inherits the gripper's 180-deg mount_yaw and
+    stays integrated.  All offsets are now expressed in the gripper_base
+    frame using the real mesh->link map
+      link_x = -0.172 + 0.001*mesh_x
+      link_y = -0.085 + 0.001*mesh_z
+      link_z =  0.083 - 0.001*mesh_y
+  note: |
+    The new_gripper itself (its 5 STLs, its Rx(-pi/2) mount transform,
+    its teeth-down orientation, its attachment to the TCP) is NOT
+    touched.  This block only ADDS pneumatic hardware so the actuation
+    is legible.
+  air_inlets:
+    inlet_a:
+      gripper_mesh_port_mm: {x: 172.2, y: 77.3, z: 56.0}   # real circular port on the fixture +Y face
+      gripper_link_xyz_m: {x: 0.0002, y: -0.029, z: 0.0057}
+      world_xyz_m: {x: 1.641548, y: 1.275726, z: 1.662493}
+      type: push-to-connect fitting (stem + hex collar), on the real gripper port
+    inlet_b:
+      gripper_mesh_port_mm: {x: 172.2, y: 77.3, z: 86.0}   # real circular port on the fixture +Y face
+      gripper_link_xyz_m: {x: 0.0002, y: 0.001, z: 0.0057}
+      world_xyz_m: {x: 1.671548, y: 1.275726, z: 1.662493}
+      type: push-to-connect fitting (stem + hex collar), on the real gripper port
+  inlets_source_v15: |
+    The two inlets sit EXACTLY on the two circular air ports found on the
+    +Y face of the new_gripper_fixture housing (mesh ports at z=56 and
+    z=86, located by geometric analysis of the STL).  No more arbitrary
+    placement.
+  cylinder_25mm:
+    name: gripper_pneumatic_cylinder_25mm
+    source: V15_proxy_integrated
+    bore_class_mm: 16        # MAL16x25-class compact cylinder
+    stroke_mm: 25
+    barrel_len_m: 0.050
+    gripper_link_barrel_centre_m: {x: 0.000, y: -0.012, z: -0.005}
+    axis: gripper_base link Y  (= mesh Z, the housing long axis)
+    mount: |
+      V15: mounted FLUSH on the +Y face of the new_gripper_fixture
+      housing, running along the housing length, held by two saddle
+      clamps, rod pointing link -Y toward the jaw mechanism.  It now
+      reads as the actuator that drives the jaws - it is NOT floating
+      outside the gripper any more (V14 had it at tool0 x=0.030, fully
+      detached).
+    anatomy: barrel + 2 end caps + extended rod + clevis + 2 port nipples + 2 saddle clamps
+    cad_search_note: |
+      Credible PROXY with the correct functional dimensions
+      (16 mm bore class, 25 mm stroke).
+  component_file: urdf/components/gripper_pneumatics.xacro
+  future_plc_signals: [DO_gripper_open_solenoid, DO_gripper_close_solenoid]
+
+pneumatic_air_supply:
+  source: V16_frl_unit_proxy_moved_behind_cobot
+  function: compressed-air preparation (Filter-Regulator-Lubricator) feeding the gripper
+  parent_frame: world
+  ros_center_m: {x: 1.670548, y: 0.450000}    # V16: was (1.500, 0.780)
+  base_z_m: 1.200
+  yaw: 0.0
+  placement_note: |
+    V16: moved to directly BEHIND the cobot pedestal (-Y side, since
+    the cobot faces +Y north toward the rotary disc).  470 mm south of
+    the cobot pedestal centre at (1.671, 0.920), outside the cobot's
+    full J1 swing envelope (~0.356 m radius at q=0).  Still on the
+    plant table, still visible from the operator side.  Out of the
+    cobot's trajectory; out of the conveyor / bins footprint.
+  anatomy: stand + regulator body + filter bowl + pressure gauge + adjustment knob + supply inlet + 2 outlets
+  outlet_a_world_m: {x: 1.655548, y: 0.450, z: 1.432}
+  outlet_b_world_m: {x: 1.685548, y: 0.450, z: 1.432}
+  cad_search_note: |
+    Searched TraceParts / SMC / Festo / 3DContentCentral for an SMC AC /
+    Festo MS-series FRL STEP.  Usable models are behind catalog logins,
+    so this is a credible PROXY with the right functional anatomy.
+  component_file: urdf/components/pneumatic_supply.xacro
+
+pneumatic_hoses:
+  source: V16_rerouted_to_frl_behind_cobot
+  source_note_v16: |
+    Re-routed because V16 moved the FRL to directly behind the cobot.
+    Hoses now climb up the back of the cobot and arc over the top to
+    the gripper inlets on the real fixture ports.
+  parent_frame: world
+  radius_m: 0.005
+  hose_a:
+    from: pneumatic_air_supply outlet A (1.655548, 0.450, 1.432)
+    to:   gripper_pneumatics inlet A fitting top (1.641548, 1.275726, 1.678)
+    waypoints_world_m:
+      - [1.655548, 0.450000, 1.432000]
+      - [1.655548, 0.500000, 1.620000]
+      - [1.660000, 0.720000, 1.760000]
+      - [1.658000, 1.060000, 1.720000]
+      - [1.641548, 1.275726, 1.678000]
+    color: blue
+  hose_b:
+    from: pneumatic_air_supply outlet B (1.685548, 0.450, 1.432)
+    to:   gripper_pneumatics inlet B fitting top (1.671548, 1.275726, 1.678)
+    waypoints_world_m:
+      - [1.685548, 0.450000, 1.432000]
+      - [1.685548, 0.500000, 1.620000]
+      - [1.690000, 0.720000, 1.760000]
+      - [1.688000, 1.060000, 1.720000]
+      - [1.671548, 1.275726, 1.678000]
+    color: red
+  note: |
+    Each hose is 4 straight cylinder segments + 3 sphere joints, routed
+    FRL outlet -> up -> arc over toward the cobot -> down to the gripper
+    inlet.  Since the whole V14 scene is static, the route is a clean
+    visual approximation, not a flexible-cable simulation.
+
+# ===========================================================================
+# V14  FUTURE PLC SIGNALS  (documentation only - no electrical model yet)
+# ---------------------------------------------------------------------------
+# These are the digital signals the cell will exchange with the PLC
+# (Modicon M262, TM262L10MESE8T) in a future iteration.  V14 does NOT
+# model wiring, terminals or control logic - this block simply reserves
+# and documents the I/O map so the next iteration has a contract.
+#   DI = digital input  to the PLC   (sensor / cobot -> PLC)
+#   DO = digital output from the PLC (PLC -> actuator driver / valve)
+# ===========================================================================
+future_plc_signals:
+  digital_inputs:
+    DI_sensor_conveyor_end:
+      direction: DI
+      source: sensor_conveyor_end (SICK GRTE18S-P2312)
+      meaning: a CAFI has reached the pick end of Conveyor 1 and is ready to be picked
+    DI_sensor_rotary_load_piece_present:
+      direction: DI
+      source: sensor_rotary_load_fixture (SICK GRTE18S-P2312)
+      meaning: a CAFI is present on the external load fixture of the rotary disc
+    DI_sensor_vision_piece_present:
+      direction: DI
+      source: sensor_vision_piece_present (SICK GRTE18S-P2312)
+      meaning: a CAFI is present on the vision fixture, ready for Cognex inspection
+    DI_cobot_cycle_or_ready:
+      direction: DI
+      source: Lexium Cobot LXMRL03S0000 controller (LXMRL03C1000)
+      meaning: |
+        The cobot will send a digital input to the PLC for process
+        coordination - e.g. "cycle complete / ready for next step".
+        V14 documents this signal only; no cobot I/O or wiring is
+        modelled yet.
+  digital_outputs:
+    DO_conveyor_motor_run:
+      direction: DO
+      target: conveyor_drive_motor (via VFD / contactor)
+      meaning: run / stop the Conveyor 1 belt drive
+    DO_rotary_table_motor_index:
+      direction: DO
+      target: rotary_table_drive NEMA 17 (via stepper driver)
+      meaning: command the 180-deg index of the riveting rotary disc
+    DO_gripper_open_solenoid:
+      direction: DO
+      target: gripper 5/2 solenoid valve (open side) -> gripper_pneumatic_cylinder_25mm
+      meaning: route air to OPEN the gripper jaws
+    DO_gripper_close_solenoid:
+      direction: DO
+      target: gripper 5/2 solenoid valve (close side) -> gripper_pneumatic_cylinder_25mm
+      meaning: route air to CLOSE the gripper jaws

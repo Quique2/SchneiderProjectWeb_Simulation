@@ -1,0 +1,13 @@
+﻿<?xml version="1.0"?>
+<package format="2">
+  <name>schneider_gripper_sim</name>
+  <version>0.26.0</version>
+  <description>Prismatic gripper jaw + grasp confirmation (V20).</description>
+  <maintainer email="miguelaor681@outlook.com">Miguel Aor</maintainer>
+  <license>BSD</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+</package>

@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!--
+  fixture_vision.xacro  -  V12 (NEW camera fixture STL)
+
+  V12 swap: old "Fixture_para_camara.STL" replaced by the user's newer
+  "Fixture para camara final.STL" (renamed to ROS-friendly
+  "Fixture_para_camara_final.STL" inside the package).  The old STL
+  has been removed from the package - only the final version remains.
+
+  New mesh bbox (mm):  X = 158.658   Y = 15.000   Z = 117.900
+      (origin at min corner, 156 triangles)
+  Old mesh bbox was:   X = 148.66    Y = 10.0     Z = 107.9   (V6..V11)
+
+  Rx(pi/2) rotation lays the plate flat (same as V6): mesh Y (15 mm
+  thickness) becomes link Z, mesh X (length) -> link X, mesh Z
+  (depth) -> link -Y.  Visual origin centers the bbox in link X / Y
+  on the workstation centre:
+      xyz_x = -158.658 / 2 / 1000   = -0.079329
+      xyz_y = +117.900 / 2 / 1000   = +0.058950
+      xyz_z = 0                       (plate base at link z=0)
+
+  After rotation + offset the camera fixture occupies:
+      link X = -0.07933 .. +0.07933  (158.658 mm length along table X)
+      link Y = -0.05895 .. +0.05895  (117.900 mm depth along table Y)
+      link Z =  0       ..  0.015    ( 15 mm thick plate)
+
+  Compared to the old fixture:
+      +10 mm in length (X)
+      + 5 mm in thickness (Z)   -> fixture top z = 1.230 (was 1.225)
+      +10 mm in depth (Y)
+
+  The CAFI (cafi.xacro, mesh 122.9 x 25.1 x 87.3 mm) keeps z_offset = 0
+  at the fixture frame, i.e. CAFI base coincides with fixture base.
+  After Rx(pi/2) on the CAFI, the CAFI is 25.1 mm tall in link Z.
+  - With the new 15 mm fixture, the CAFI base sits at link z=0 (same
+    plane as the fixture base) and the CAFI top is at link z=0.025.
+    The CAFI nests INTO the 15 mm saddle and sticks out the top by
+    25.1 - 15 = 10 mm.  (Old fixture: 25.1 - 10 = 15 mm protrusion.)
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="fixture_vision" params="name parent base_z yaw">
+    <link name="${name}">
+      <visual>
+        <origin xyz="-0.079329 0.058950 0.000000"
+                rpy="1.5707963267948966 0 0"/>
+        <geometry>
+          <mesh
+            filename="package://schneider_cell_description/meshes/fixtures/Fixture_para_camara_final.STL"
+            scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="fixture_mat"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="0 0 ${base_z}" rpy="0 0 ${yaw}"/>
+    </joint>
+
+    <!-- V28: explicit cafi_seat frame so object_manager settling can
+         look up the world seat pose without falling back.  The seat
+         sits at link Z = +0.015 (fixture top) + CAFI_LZ/2 = +0.0275.
+
+         V30 FIX A: rotated 180 deg around link X so the CAFI top
+         face aligns with the fixture top (same convention as
+         fixture_rivet cafi_seat). -->
+    <link name="${name}_cafi_seat"/>
+    <joint name="${name}_to_cafi_seat" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_cafi_seat"/>
+      <origin xyz="0 0 0.0275" rpy="3.141592653589793 0 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

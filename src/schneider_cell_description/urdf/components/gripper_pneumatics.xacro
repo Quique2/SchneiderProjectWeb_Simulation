@@ -1,0 +1,194 @@
+<?xml version="1.0"?>
+<!--
+  gripper_pneumatics.xacro  -  V21 (piston oriented along the LONG housing
+                                    axis where it actually fits, rod is a
+                                    CHILD OF THE MOVING JAW so it follows
+                                    the prismatic motion)
+  ===========================================================================
+  V20 BUG (observed in RViz by user):
+    Sub-anchor rpy was (0, -pi/2, 0) which makes the cylinder axis lie
+    along link X (the gripper's THICKNESS direction, only 25 mm thick).
+    The 46 mm barrel + 2x 8 mm caps + clamp + rod (~75 mm total) does NOT
+    fit in 25 mm. The cap_rear at sub Z=-0.027 maps to link X=+0.027
+    -> 12 mm OUTSIDE the housing back. The cap_front and rod at sub Z>0
+    map to link X<0 -> sticking out the jaw side. The cylinder visually
+    spilled out the housing on both sides.
+
+  V21 FIX (this file):
+   [1] Cylinder lies along link +Y (the LONG axis of the housing, 170 mm
+       available, plenty of room for the cluster).
+   [2] Sub-anchor rpy = (-pi/2, 0, 0) i.e. Rx(-pi/2), so sub +Z -> link +Y.
+       Anchor placed at link (0.002, 0, 0.045) - centred in housing X and
+       Z, at Y=0 (the gripper's lengthwise midpoint).
+   [3] Barrel + caps + clamp_band STAY children of the static anchor:
+       they belong to the gripper body, do not move with the jaw.
+   [4] The ROD becomes a CHILD OF ${parent}_jaw (the prismatic jaw link
+       declared in new_gripper.xacro). The rod visual is oriented along
+       link +X (the jaw motion axis). At jaw=0 (closed) the rod sits at
+       link X ~ +0.005 (just inside the housing); at jaw=-0.016 (open)
+       the rod shifts to link X ~ -0.011, visibly sliding TOGETHER with
+       the jaw plate. This satisfies the user requirement "el vastago
+       debe acompanar al movimiento del jaw".
+
+  Housing bbox in link frame (from new_gripper.xacro mesh transform):
+       X (thickness)     : [-0.010, +0.015]  =  25 mm thick
+       Y (long axis)     : [-0.084, +0.086]  = 170 mm long
+       Z (tool0 -down)   : [+0.006, +0.083]  =  77 mm tall
+
+  Cluster bounds with V21 anchor:
+       barrel   r=0.0110 L=0.046 along Y, centred at (0.002, 0, 0.045)
+                                          link Y [-0.023, +0.023]      OK
+       cap_rear r=0.0130 L=0.008 at link Y = -0.027                    OK
+       cap_front r=0.0130 L=0.008 at link Y = +0.027                   OK
+       clamp_band 0.018 x 0.005 x 0.030 centred                        OK
+
+  Rod (child of jaw, V21):
+       cylinder r=0.0045 L=0.030 along link +X
+       jaw-frame xyz = (-0.005, 0.027, 0.045)
+       at jaw_joint=0      -> gripper_base X centre = -0.005
+                              (rod spans link X = [-0.020, +0.010])
+       at jaw_joint=-0.016 -> gripper_base X centre = -0.021
+                              (rod spans link X = [-0.036, -0.006])
+       Rod Y = +0.027  aligns with cap_front Y centre, so at closed the
+                       rod's back end visually touches the cap_front face.
+
+  Pneumatic logic (unchanged from V19/V20):
+       DO_gripper_open_solenoid   -> 5/2 valve, OPEN side
+       DO_gripper_close_solenoid  -> 5/2 valve, CLOSE side
+
+  Macro contract (UNCHANGED): name + parent.  parent must be the
+  gripper_base link.  This macro assumes the existence of a sibling
+  link `${parent}_jaw` (declared by new_gripper.xacro V20/V21).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- one push-to-connect air inlet fitting, sitting on a gripper port. -->
+  <xacro:macro name="_air_fitting" params="name parent x y z">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 -0.010" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0040" length="0.020"/></geometry>
+        <material name="pneumatic_fitting"/>
+      </visual>
+      <visual>
+        <origin xyz="0 0 0.002" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0064" length="0.006"/></geometry>
+        <material name="pneumatic_fitting_collar"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="gripper_pneumatics" params="name parent">
+
+    <!-- ===== anchor on the gripper body (STATIC) ===================== -->
+    <link name="${name}"/>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== two air inlet fittings on the real housing ports ======= -->
+    <xacro:_air_fitting name="${name}_inlet_a" parent="${name}"
+                        x="0.0002" y="-0.029" z="0.0057"/>
+    <xacro:_air_fitting name="${name}_inlet_b" parent="${name}"
+                        x="0.0002" y="0.001" z="0.0057"/>
+
+    <!-- ===== V21 sub-anchor: cylinder along link +Y (long axis) ======
+         Rx(-pi/2) maps the native cylinder +Z axis onto link +Y.
+         Anchor placed at the housing geometric centre. -->
+    <link name="${name}_cyl_anchor"/>
+    <joint name="${name}_to_cyl_anchor" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_cyl_anchor"/>
+      <origin xyz="0.002 0 0.045" rpy="-1.5707963267948966 0 0"/>
+    </joint>
+
+    <!-- barrel : 46 mm long, fits in housing Y range -->
+    <link name="${name}_cylinder_25mm">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0110" length="0.046"/></geometry>
+        <material name="pneumatic_cylinder"/>
+      </visual>
+    </link>
+    <joint name="${name}_cyl_anchor_to_cylinder_25mm" type="fixed">
+      <parent link="${name}_cyl_anchor"/>
+      <child  link="${name}_cylinder_25mm"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- rear end cap (link Y = -0.027, opposite side from the jaw) -->
+    <link name="${name}_cyl_cap_rear">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0130" length="0.008"/></geometry>
+        <material name="pneumatic_cylinder_cap"/>
+      </visual>
+    </link>
+    <joint name="${name}_cyl_anchor_to_cyl_cap_rear" type="fixed">
+      <parent link="${name}_cyl_anchor"/>
+      <child  link="${name}_cyl_cap_rear"/>
+      <origin xyz="0 0 -0.027" rpy="0 0 0"/>
+    </joint>
+
+    <!-- front end cap (link Y = +0.027, jaw side; rod emerges from here) -->
+    <link name="${name}_cyl_cap_front">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0130" length="0.008"/></geometry>
+        <material name="pneumatic_cylinder_cap"/>
+      </visual>
+    </link>
+    <joint name="${name}_cyl_anchor_to_cyl_cap_front" type="fixed">
+      <parent link="${name}_cyl_anchor"/>
+      <child  link="${name}_cyl_cap_front"/>
+      <origin xyz="0 0 0.027" rpy="0 0 0"/>
+    </joint>
+
+    <!-- clamp band (asymmetric mount bracket inside the housing) -->
+    <link name="${name}_cyl_clamp_band">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.018 0.005 0.030"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_cyl_anchor_to_cyl_clamp_band" type="fixed">
+      <parent link="${name}_cyl_anchor"/>
+      <child  link="${name}_cyl_clamp_band"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== V21 ROD: CHILD OF THE MOVING JAW =======================
+         The rod represents the actuator's visible output stroke. It is
+         parented to ${parent}_jaw (declared by new_gripper.xacro V20/V21)
+         so that its world pose follows the jaw_joint motion. Visually,
+         when the jaw opens (joint=-0.016) the rod slides in link -X by
+         16 mm together with the jaw plate.
+
+         Geometry: cylinder radius 0.0045, length 0.030, oriented along
+         link +X via Ry(+pi/2). Position: jaw-frame xyz=(-0.005, 0.027,
+         0.045). The Y coordinate matches cap_front Y so at closed the
+         rod's back end is visually flush with the cap_front face. -->
+    <link name="${name}_cyl_rod">
+      <visual>
+        <origin xyz="-0.005 0.027 0.045" rpy="0 1.5707963267948966 0"/>
+        <geometry><cylinder radius="0.0045" length="0.030"/></geometry>
+        <material name="pneumatic_rod"/>
+      </visual>
+    </link>
+    <joint name="${parent}_jaw_to_${name}_cyl_rod" type="fixed">
+      <parent link="${parent}_jaw"/>
+      <child  link="${name}_cyl_rod"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

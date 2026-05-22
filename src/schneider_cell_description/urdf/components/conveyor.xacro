@@ -1,0 +1,235 @@
+<?xml version="1.0"?>
+<!--
+  conveyor.xacro  -  V16 (V3 V26-styled belt + optional rail notch for the
+                          end-of-belt photoelectric sensor line of sight)
+
+  Visual recipe (matches the V26 reference cell):
+    - flat dark belt on top                      (size_x x size_y x belt_t)
+    - two side rails, slightly above the belt    (length x rail_w x rail_h)
+    - 4 corner support legs                      (cyl, leg_radius)
+
+  V16 adds OPTIONAL parameters that cut a LOCAL notch in one side rail
+  so that an external photoelectric sensor mounted just outside the rail
+  has a clean line of sight to the belt at the notch X coordinate:
+      notch_n_x_local : local X position (conveyor frame) of the notch on
+                        the NEGATIVE (long_axis='x' -> south, 'y' -> west)
+                        rail.  Default 0 (centre of the long axis).
+      notch_n_w       : width of the notch along the long axis.  Default
+                        0 means "no notch, single full rail" - V15
+                        behaviour preserved.
+      notch_p_x_local : same on the POSITIVE-side rail.  Default 0.
+      notch_p_w       : same on the POSITIVE-side rail.  Default 0.
+
+  The XY footprint (size_x, size_y) stays EXACTLY what scene_dimensions.yaml
+  says. Only the volume, profile and legs are V26-style. `long_axis` selects
+  which pair of edges receives the rails (the long sides).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- File-scope helper for one corner leg (matches the V2 pattern: some
+       older xacros don't expand macro-in-macro reliably). -->
+  <xacro:macro name="_conv_leg"
+               params="name parent suffix dx dy leg_radius leg_len leg_ctr_z">
+    <link name="${name}_leg_${suffix}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="${leg_radius}" length="${leg_len}"/></geometry>
+        <material name="table_leg"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_leg_${suffix}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_leg_${suffix}"/>
+      <origin xyz="${dx} ${dy} ${leg_ctr_z}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="conveyor_section"
+               params="name parent xy_x xy_y size_x size_y top_z body_height
+                       long_axis:='x' support_z:='0.0'
+                       notch_n_x_local:='0' notch_n_w:='0'
+                       notch_p_x_local:='0' notch_p_w:='0'">
+
+    <!-- V8: support_z lets the conveyor sit on top of the plant table.
+         legs span from the belt down to support_z (world Z).  Default
+         remains 0.0 = floor, so V7 callers keep working. -->
+    <xacro:property name="belt_t"      value="0.020"/>
+    <xacro:property name="rail_w"      value="0.030"/>
+    <xacro:property name="rail_h"      value="0.060"/>
+    <xacro:property name="leg_radius"  value="0.022"/>
+    <xacro:property name="leg_inset"   value="0.045"/>
+    <xacro:property name="belt_top_z"  value="${top_z}"/>
+    <xacro:property name="belt_ctr_z"  value="${belt_top_z - belt_t/2}"/>
+
+    <!-- ============ flat dark belt (top surface of the conveyor) ====== -->
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${size_x} ${size_y} ${belt_t}"/>
+        </geometry>
+        <material name="conveyor_band"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xy_x} ${xy_y} ${belt_ctr_z}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ side rails, with optional X notches when long_axis='x' -->
+    <xacro:if value="${long_axis == 'x'}">
+
+      <!-- POSITIVE rail (north when long_axis='x') -->
+      <xacro:if value="${float(notch_p_w) > 0}">
+        <xacro:property name="p_west_len"
+                        value="${(notch_p_x_local - notch_p_w/2) - (-size_x/2)}"/>
+        <xacro:property name="p_west_ctr"
+                        value="${(-size_x/2 + (notch_p_x_local - notch_p_w/2))/2}"/>
+        <xacro:property name="p_east_len"
+                        value="${(size_x/2) - (notch_p_x_local + notch_p_w/2)}"/>
+        <xacro:property name="p_east_ctr"
+                        value="${((notch_p_x_local + notch_p_w/2) + size_x/2)/2}"/>
+        <link name="${name}_rail_p_w">
+          <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="${p_west_len} ${rail_w} ${rail_h}"/></geometry>
+            <material name="conveyor_body"/>
+          </visual>
+        </link>
+        <joint name="${name}_to_rail_p_w" type="fixed">
+          <parent link="${name}"/><child link="${name}_rail_p_w"/>
+          <origin xyz="${p_west_ctr} ${ size_y/2 + rail_w/2}
+                       ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+        </joint>
+        <link name="${name}_rail_p_e">
+          <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="${p_east_len} ${rail_w} ${rail_h}"/></geometry>
+            <material name="conveyor_body"/>
+          </visual>
+        </link>
+        <joint name="${name}_to_rail_p_e" type="fixed">
+          <parent link="${name}"/><child link="${name}_rail_p_e"/>
+          <origin xyz="${p_east_ctr} ${ size_y/2 + rail_w/2}
+                       ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+        </joint>
+      </xacro:if>
+      <xacro:unless value="${float(notch_p_w) > 0}">
+        <link name="${name}_rail_p">
+          <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="${size_x} ${rail_w} ${rail_h}"/></geometry>
+            <material name="conveyor_body"/>
+          </visual>
+        </link>
+        <joint name="${name}_to_rail_p" type="fixed">
+          <parent link="${name}"/><child link="${name}_rail_p"/>
+          <origin xyz="0 ${ size_y/2 + rail_w/2}
+                       ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+        </joint>
+      </xacro:unless>
+
+      <!-- NEGATIVE rail (south when long_axis='x') -->
+      <xacro:if value="${float(notch_n_w) > 0}">
+        <xacro:property name="n_west_len"
+                        value="${(notch_n_x_local - notch_n_w/2) - (-size_x/2)}"/>
+        <xacro:property name="n_west_ctr"
+                        value="${(-size_x/2 + (notch_n_x_local - notch_n_w/2))/2}"/>
+        <xacro:property name="n_east_len"
+                        value="${(size_x/2) - (notch_n_x_local + notch_n_w/2)}"/>
+        <xacro:property name="n_east_ctr"
+                        value="${((notch_n_x_local + notch_n_w/2) + size_x/2)/2}"/>
+        <link name="${name}_rail_n_w">
+          <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="${n_west_len} ${rail_w} ${rail_h}"/></geometry>
+            <material name="conveyor_body"/>
+          </visual>
+        </link>
+        <joint name="${name}_to_rail_n_w" type="fixed">
+          <parent link="${name}"/><child link="${name}_rail_n_w"/>
+          <origin xyz="${n_west_ctr} ${-size_y/2 - rail_w/2}
+                       ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+        </joint>
+        <link name="${name}_rail_n_e">
+          <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="${n_east_len} ${rail_w} ${rail_h}"/></geometry>
+            <material name="conveyor_body"/>
+          </visual>
+        </link>
+        <joint name="${name}_to_rail_n_e" type="fixed">
+          <parent link="${name}"/><child link="${name}_rail_n_e"/>
+          <origin xyz="${n_east_ctr} ${-size_y/2 - rail_w/2}
+                       ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+        </joint>
+      </xacro:if>
+      <xacro:unless value="${float(notch_n_w) > 0}">
+        <link name="${name}_rail_n">
+          <visual>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry><box size="${size_x} ${rail_w} ${rail_h}"/></geometry>
+            <material name="conveyor_body"/>
+          </visual>
+        </link>
+        <joint name="${name}_to_rail_n" type="fixed">
+          <parent link="${name}"/><child link="${name}_rail_n"/>
+          <origin xyz="0 ${-size_y/2 - rail_w/2}
+                       ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+        </joint>
+      </xacro:unless>
+
+    </xacro:if>
+    <xacro:if value="${long_axis == 'y'}">
+      <link name="${name}_rail_p">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry><box size="${rail_w} ${size_y} ${rail_h}"/></geometry>
+          <material name="conveyor_body"/>
+        </visual>
+      </link>
+      <joint name="${name}_to_rail_p" type="fixed">
+        <parent link="${name}"/><child link="${name}_rail_p"/>
+        <origin xyz="${ size_x/2 + rail_w/2} 0
+                     ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+      </joint>
+      <link name="${name}_rail_n">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry><box size="${rail_w} ${size_y} ${rail_h}"/></geometry>
+          <material name="conveyor_body"/>
+        </visual>
+      </link>
+      <joint name="${name}_to_rail_n" type="fixed">
+        <parent link="${name}"/><child link="${name}_rail_n"/>
+        <origin xyz="${-size_x/2 - rail_w/2} 0
+                     ${rail_h/2 - belt_t/2 + 0.010}" rpy="0 0 0"/>
+      </joint>
+    </xacro:if>
+
+    <!-- ============ 4 corner legs ================================== -->
+    <!-- V8: legs span belt_bottom -> support_z (default support_z=0 floor) -->
+    <xacro:property name="leg_len"   value="${belt_top_z - belt_t - support_z}"/>
+    <xacro:property name="leg_ctr_z" value="${-belt_t/2 - leg_len/2}"/>
+
+    <xacro:_conv_leg name="${name}" parent="${name}" suffix="pp"
+                     dx="${ size_x/2 - leg_inset}" dy="${ size_y/2 - leg_inset}"
+                     leg_radius="${leg_radius}" leg_len="${leg_len}"
+                     leg_ctr_z="${leg_ctr_z}"/>
+    <xacro:_conv_leg name="${name}" parent="${name}" suffix="pn"
+                     dx="${ size_x/2 - leg_inset}" dy="${-size_y/2 + leg_inset}"
+                     leg_radius="${leg_radius}" leg_len="${leg_len}"
+                     leg_ctr_z="${leg_ctr_z}"/>
+    <xacro:_conv_leg name="${name}" parent="${name}" suffix="np"
+                     dx="${-size_x/2 + leg_inset}" dy="${ size_y/2 - leg_inset}"
+                     leg_radius="${leg_radius}" leg_len="${leg_len}"
+                     leg_ctr_z="${leg_ctr_z}"/>
+    <xacro:_conv_leg name="${name}" parent="${name}" suffix="nn"
+                     dx="${-size_x/2 + leg_inset}" dy="${-size_y/2 + leg_inset}"
+                     leg_radius="${leg_radius}" leg_len="${leg_len}"
+                     leg_ctr_z="${leg_ctr_z}"/>
+
+  </xacro:macro>
+
+</robot>

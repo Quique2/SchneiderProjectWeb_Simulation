@@ -1,0 +1,158 @@
+<?xml version="1.0"?>
+<!--
+  lexium_cobot_l03s_macro.xacro
+  ===========================================================================
+  XACRO macro wrapper around the Lexium L03S URDF (Cobot_URDFBUENO).
+
+  V36 CORRECTIONS to the canonical chain (user-authorised):
+
+    [V36-A] joint_2 origin rpy "0 0 0.05" -> "0 0 0".
+            The 0.05 rad (2.86 deg) skew around Z on joint_2 came from
+            a CAD measurement artifact and was the root cause of the
+            small visible "wobble" the user reported (link2 mesh sat
+            at +2.86 deg around base Z at q=0).  Removing it makes the
+            shoulder-to-upper-arm transition visually clean and the
+            chain centerline straight at q=0.
+
+  Aside from the joint_2 rpy correction, the kinematic chain is
+  identical to the source URDF:
+
+       base_link        joint_1 (Y, +/-180)   link1_shoulder
+       link1_shoulder   joint_2 (Z, +/-150)   link2_upper_arm
+       link2_upper_arm  joint_3 (Z, +/-150)   link3_forearm
+       link3_forearm    joint_4 (Z, +/-180)   link4_wrist1
+       link4_wrist1     joint_5 (Y, +/-120)   link5_wrist2
+       link5_wrist2     joint_6 (Z, +/-180)   link6_wrist3
+       link6_wrist3     joint_tool0 (fixed)   tool0
+
+  ALL link names and joint names are prefixed with ${name}_ so multiple
+  instances do not clash, AND so the V30 plant scripts can address them
+  by namespace.  The geometry (origin xyz/rpy of each joint, axis xyz,
+  joint limits, mesh-to-link assignment, tool0 fixed origin and the
+  parent-child topology) is untouched.
+
+  Mesh paths reference the lexium_cobot_urdfbueno package; the meshes
+  themselves are the unmodified STLs from Cobot_URDFBUENO.zip.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="lexium_cobot_urdfbueno"
+               params="name parent mount_xyz:='0 0 0' mount_rpy:='0 0 0'">
+
+    <!-- ===== materials (per the canonical URDF) ====================== -->
+    <material name="${name}_lexium_grey"><color rgba="0.40 0.40 0.45 1.0"/></material>
+    <material name="${name}_lexium_dark"><color rgba="0.25 0.25 0.28 1.0"/></material>
+
+    <!-- ===== Anchor joint (external attachment, NOT part of the
+              canonical chain) =========================================== -->
+    <joint name="${parent}_to_${name}_base_link" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_base_link"/>
+      <origin xyz="${mount_xyz}" rpy="${mount_rpy}"/>
+    </joint>
+
+    <!-- ===== base_link (canonical) =================================== -->
+    <link name="${name}_base_link">
+      <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link0_base.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_dark"/></visual>
+      <collision><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link0_base.STL" scale="0.001 0.001 0.001"/></geometry></collision>
+      <inertial><mass value="3.5"/><origin xyz="0.1623 0.0436 0.0645"/><inertia ixx="0.010" ixy="0" ixz="0" iyy="0.010" iyz="0" izz="0.008"/></inertial>
+    </link>
+
+    <joint name="${name}_joint_1" type="revolute">
+      <parent link="${name}_base_link"/><child link="${name}_link1_shoulder"/>
+      <origin xyz="0.1623 0.0867 0.0645" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50.0"/>
+      <dynamics damping="0.5" friction="0.1"/>
+    </joint>
+
+    <link name="${name}_link1_shoulder">
+      <visual><origin xyz="-0.1623 -0.0867 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link1_shoulder_rotation.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <collision><origin xyz="-0.1623 -0.0867 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link1_shoulder_rotation.STL" scale="0.001 0.001 0.001"/></geometry></collision>
+      <inertial><mass value="2.0"/><origin xyz="0 0.062 0"/><inertia ixx="0.006" ixy="0" ixz="0" iyy="0.006" iyz="0" izz="0.004"/></inertial>
+    </link>
+
+    <joint name="${name}_joint_2" type="revolute">
+      <parent link="${name}_link1_shoulder"/><child link="${name}_link2_upper_arm"/>
+      <origin xyz="-0.0115 0.0639 0.0000" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-2.61799" upper="2.61799" velocity="3.14" effort="50.0"/>
+      <dynamics damping="0.5" friction="0.1"/>
+    </joint>
+
+    <link name="${name}_link2_upper_arm">
+      <visual><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link2_shoulder_connector.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <visual><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link2_elbow_joint.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <visual><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link3_elbow_connector.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <collision><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link2_shoulder_connector.STL" scale="0.001 0.001 0.001"/></geometry></collision>
+      <inertial><mass value="1.8"/><origin xyz="0 0.075 0"/><inertia ixx="0.008" ixy="0" ixz="0" iyy="0.008" iyz="0" izz="0.003"/></inertial>
+    </link>
+
+    <joint name="${name}_joint_3" type="revolute">
+      <parent link="${name}_link2_upper_arm"/><child link="${name}_link3_forearm"/>
+      <origin xyz="-0.0015 0.2450 0.2258" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-2.61799" upper="2.61799" velocity="3.14" effort="50.0"/>
+      <dynamics damping="0.5" friction="0.1"/>
+    </joint>
+
+    <link name="${name}_link3_forearm">
+      <visual><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link3_forearm.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <visual><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link6_wrist3_cylinder.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <visual><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link5_wrist2_body.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <collision><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link3_forearm.STL" scale="0.001 0.001 0.001"/></geometry></collision>
+      <inertial><mass value="1.2"/><origin xyz="0 0.117 0"/><inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.002"/></inertial>
+    </link>
+
+    <joint name="${name}_joint_4" type="revolute">
+      <parent link="${name}_link3_forearm"/><child link="${name}_link4_wrist1"/>
+      <origin xyz="-0.0060 0.2295 0.1244" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50.0"/>
+      <dynamics damping="0.3" friction="0.05"/>
+    </joint>
+
+    <link name="${name}_link4_wrist1">
+      <visual><origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link4_wrist1_cylinder.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <visual><origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link5_wrist2_cylinder.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <collision><origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link4_wrist1_cylinder.STL" scale="0.001 0.001 0.001"/></geometry></collision>
+      <inertial><mass value="0.8"/><origin xyz="0 0.021 0"/><inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/></inertial>
+    </link>
+
+    <joint name="${name}_joint_5" type="revolute">
+      <parent link="${name}_link4_wrist1"/><child link="${name}_link5_wrist2"/>
+      <origin xyz="-0.0010 0.0465 -0.2300" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-2.09440" upper="2.09440" velocity="3.14" effort="50.0"/>
+      <dynamics damping="0.3" friction="0.05"/>
+    </joint>
+
+    <link name="${name}_link5_wrist2">
+      <visual><origin xyz="-0.1423 -0.6716 -0.1847" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link6_wrist3_upper_body.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
+      <collision><origin xyz="-0.1423 -0.6716 -0.1847" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link6_wrist3_upper_body.STL" scale="0.001 0.001 0.001"/></geometry></collision>
+      <inertial><mass value="0.4"/><origin xyz="0 0.061 0"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+    </link>
+
+    <joint name="${name}_joint_6" type="revolute">
+      <parent link="${name}_link5_wrist2"/><child link="${name}_link6_wrist3"/>
+      <origin xyz="-0.0040 0.0720 0.0898" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50.0"/>
+      <dynamics damping="0.2" friction="0.05"/>
+    </joint>
+
+    <link name="${name}_link6_wrist3">
+      <visual><origin xyz="-0.1383 -0.7436 -0.2745" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link6_tool_flange.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_dark"/></visual>
+      <collision><origin xyz="-0.1383 -0.7436 -0.2745" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_urdfbueno/meshes/link6_tool_flange.STL" scale="0.001 0.001 0.001"/></geometry></collision>
+      <inertial><mass value="0.3"/><origin xyz="0 0.034 0"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+    </link>
+
+    <joint name="${name}_joint_tool0" type="fixed">
+      <parent link="${name}_link6_wrist3"/><child link="${name}_tool0"/>
+      <origin xyz="0 0.068 0" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_tool0"/>
+
+  </xacro:macro>
+
+</robot>

@@ -1,0 +1,232 @@
+<?xml version="1.0"?>
+<!--
+  pneumatic_supply.xacro  -  V14 NEW
+
+  Compressed-air supply for the cell + hose-routing helpers.
+
+  [A] pneumatic_air_supply : a compact FRL air-preparation unit
+      (Filter-Regulator-Lubricator) on a short stand, sitting on the
+      plant table just south-west of the cobot pedestal - "un costado"
+      of the work area, clear of the cobot's north-facing operating
+      zone.  Two OUTLET ports on top feed hose A and hose B to the
+      new_gripper's two air inlets.
+
+      CAD search (brief 5.2 / 8): looked for an SMC AC / Festo MS-series
+      FRL STEP on TraceParts / SMC / Festo / 3DContentCentral.  Usable
+      models are behind catalog logins, so this is a credible PROXY
+      with the right functional anatomy (regulator body, filter bowl,
+      pressure gauge, adjustment knob, inlet + 2 outlets).
+
+  [B] hose_segment : one straight cylinder between two 3D points
+      (world frame).  rpy is computed so the cylinder Z axis aligns
+      with (P2 - P1).
+
+  [C] pneumatic_hose : a 4-segment polyline (5 waypoints) built from
+      hose_segment, with small sphere joints, for a clean curved run
+      from the FRL outlets to the gripper inlets.
+
+  Future PLC note: the FRL itself carries no electrical signal, but the
+  5/2 solenoid valve it feeds is driven by DO_gripper_open_solenoid /
+  DO_gripper_close_solenoid (see gripper_pneumatics.xacro).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ===================================================================
+       [A]  FRL air-preparation unit
+       =================================================================== -->
+  <xacro:macro name="pneumatic_air_supply"
+               params="name parent xy_x xy_y base_z yaw">
+
+    <link name="${name}"/>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xy_x} ${xy_y} ${base_z}" rpy="0 0 ${yaw}"/>
+    </joint>
+
+    <!-- short mounting stand -->
+    <link name="${name}_post">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.014" length="0.120"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_post" type="fixed">
+      <parent link="${name}"/><child link="${name}_post"/>
+      <origin xyz="0 0 0.060" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_stand_plate">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.080 0.080 0.008"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_stand_plate" type="fixed">
+      <parent link="${name}"/><child link="${name}_stand_plate"/>
+      <origin xyz="0 0 0.004" rpy="0 0 0"/>
+    </joint>
+
+    <!-- regulator body -->
+    <link name="${name}_regulator">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.054 0.058 0.100"/></geometry>
+        <material name="frl_body"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_regulator" type="fixed">
+      <parent link="${name}"/><child link="${name}_regulator"/>
+      <origin xyz="0 0 0.170" rpy="0 0 0"/>
+    </joint>
+
+    <!-- filter bowl (translucent) below the body -->
+    <link name="${name}_bowl">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.020" length="0.046"/></geometry>
+        <material name="frl_bowl"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_bowl" type="fixed">
+      <parent link="${name}"/><child link="${name}_bowl"/>
+      <origin xyz="0 0 0.097" rpy="0 0 0"/>
+    </joint>
+
+    <!-- pressure gauge on the -Y face -->
+    <link name="${name}_gauge">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5707963267948966 0 0"/>
+        <geometry><cylinder radius="0.018" length="0.014"/></geometry>
+        <material name="frl_gauge"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_gauge" type="fixed">
+      <parent link="${name}"/><child link="${name}_gauge"/>
+      <origin xyz="0 -0.036 0.190" rpy="0 0 0"/>
+    </joint>
+
+    <!-- adjustment knob on top -->
+    <link name="${name}_knob">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.015" length="0.020"/></geometry>
+        <material name="frl_knob"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_knob" type="fixed">
+      <parent link="${name}"/><child link="${name}_knob"/>
+      <origin xyz="0 0 0.230" rpy="0 0 0"/>
+    </joint>
+
+    <!-- supply inlet (from the compressor) on the -X face -->
+    <link name="${name}_inlet">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 1.5707963267948966 0"/>
+        <geometry><cylinder radius="0.0055" length="0.018"/></geometry>
+        <material name="pneumatic_fitting"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_inlet" type="fixed">
+      <parent link="${name}"/><child link="${name}_inlet"/>
+      <origin xyz="-0.036 0 0.150" rpy="0 0 0"/>
+    </joint>
+
+    <!-- outlet A (top, -X side) -> hose A -> gripper inlet A -->
+    <link name="${name}_outlet_a">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0048" length="0.020"/></geometry>
+        <material name="pneumatic_fitting"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_outlet_a" type="fixed">
+      <parent link="${name}"/><child link="${name}_outlet_a"/>
+      <origin xyz="-0.015 0 0.232" rpy="0 0 0"/>
+    </joint>
+
+    <!-- outlet B (top, +X side) -> hose B -> gripper inlet B -->
+    <link name="${name}_outlet_b">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0048" length="0.020"/></geometry>
+        <material name="pneumatic_fitting"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_outlet_b" type="fixed">
+      <parent link="${name}"/><child link="${name}_outlet_b"/>
+      <origin xyz="0.015 0 0.232" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+  <!-- ===================================================================
+       [B]  one straight hose cylinder between two world points
+       =================================================================== -->
+  <xacro:macro name="hose_segment"
+               params="name parent x1 y1 z1 x2 y2 z2 radius material">
+    <xacro:property name="dx" value="${x2 - x1}"/>
+    <xacro:property name="dy" value="${y2 - y1}"/>
+    <xacro:property name="dz" value="${z2 - z1}"/>
+    <xacro:property name="seg_len" value="${sqrt(dx*dx + dy*dy + dz*dz)}"/>
+    <xacro:property name="seg_yaw" value="${atan2(dy, dx)}"/>
+    <xacro:property name="seg_pitch" value="${atan2(sqrt(dx*dx + dy*dy), dz)}"/>
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="${radius}" length="${seg_len}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${(x1+x2)/2} ${(y1+y2)/2} ${(z1+z2)/2}"
+              rpy="0 ${seg_pitch} ${seg_yaw}"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- ===================================================================
+       [C]  4-segment routed hose (5 waypoints) with sphere joints
+       =================================================================== -->
+  <xacro:macro name="pneumatic_hose"
+               params="name parent radius material
+                       x1 y1 z1 x2 y2 z2 x3 y3 z3 x4 y4 z4 x5 y5 z5">
+    <xacro:hose_segment name="${name}_s1" parent="${parent}" radius="${radius}"
+                        material="${material}"
+                        x1="${x1}" y1="${y1}" z1="${z1}"
+                        x2="${x2}" y2="${y2}" z2="${z2}"/>
+    <xacro:hose_segment name="${name}_s2" parent="${parent}" radius="${radius}"
+                        material="${material}"
+                        x1="${x2}" y1="${y2}" z1="${z2}"
+                        x2="${x3}" y2="${y3}" z2="${z3}"/>
+    <xacro:hose_segment name="${name}_s3" parent="${parent}" radius="${radius}"
+                        material="${material}"
+                        x1="${x3}" y1="${y3}" z1="${z3}"
+                        x2="${x4}" y2="${y4}" z2="${z4}"/>
+    <xacro:hose_segment name="${name}_s4" parent="${parent}" radius="${radius}"
+                        material="${material}"
+                        x1="${x4}" y1="${y4}" z1="${z4}"
+                        x2="${x5}" y2="${y5}" z2="${z5}"/>
+    <!-- sphere joints at the 3 interior waypoints for a smooth bend -->
+    <xacro:macro name="_hose_knot" params="kname kx ky kz">
+      <link name="${kname}">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry><sphere radius="${radius}"/></geometry>
+          <material name="${material}"/>
+        </visual>
+      </link>
+      <joint name="${parent}_to_${kname}" type="fixed">
+        <parent link="${parent}"/><child link="${kname}"/>
+        <origin xyz="${kx} ${ky} ${kz}" rpy="0 0 0"/>
+      </joint>
+    </xacro:macro>
+    <xacro:_hose_knot kname="${name}_k2" kx="${x2}" ky="${y2}" kz="${z2}"/>
+    <xacro:_hose_knot kname="${name}_k3" kx="${x3}" ky="${y3}" kz="${z3}"/>
+    <xacro:_hose_knot kname="${name}_k4" kx="${x4}" ky="${y4}" kz="${z4}"/>
+  </xacro:macro>
+
+</robot>

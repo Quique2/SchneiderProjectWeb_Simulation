@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!--
+  Standalone wrapper that instantiates the lexium_cobot_l03s macro on a
+  world root link.  Used by display_l03s.launch for PRUEBA 1.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="lexium_cobot_l03s_standalone">
+
+  <xacro:include filename="$(find lexium_cobot_description)/urdf/lexium_cobot_l03s.urdf.xacro"/>
+
+  <link name="world"/>
+
+  <!-- Optional reference floor so RViz "world" frame stays grounded -->
+  <link name="floor">
+    <visual>
+      <origin xyz="0 0 -0.002" rpy="0 0 0"/>
+      <geometry><box size="1.60 1.60 0.004"/></geometry>
+      <material name="floor_mat"><color rgba="0.78 0.78 0.78 1.0"/></material>
+    </visual>
+  </link>
+  <joint name="world_to_floor" type="fixed">
+    <parent link="world"/>
+    <child  link="floor"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Mount cobot upright (base on floor, arm pointing +Z up).
+       CAD assembly uses +Y as real-world vertical.  We map CAD frame to
+       world frame via Rx(+pi/2):
+            CAD +X -> world +X
+            CAD +Y -> world +Z   (vertical up, brazo apunta arriba)
+            CAD +Z -> world -Y   (we offset base in +Y so it stays
+                                  visually centered on the floor)
+       Center the base footprint on world origin:
+            base CAD bbox: X[0,0.129] Y[0,0.086] Z[0,0.129]
+            after Rx(+pi/2): X[0,0.129] (was X) Y[-0.129,0] (from -Z) Z[0,0.086] (from Y)
+       We translate the mount by xyz so base bottom-center sits on (0,0,0).
+       Bottom-center post-rotation = (0.065, -0.065, 0).
+       Translation = -bottom-center = (-0.065, +0.065, 0). -->
+  <xacro:lexium_cobot_l03s name="lexium"
+                            parent="world"
+                            mount_xyz="-0.065 0.065 0"
+                            mount_rpy="1.5707963267948966 0 0"/>
+
+</robot>

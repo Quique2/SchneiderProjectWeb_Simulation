@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<!--
+  rotary_drive_nema17_planetary.xacro  -  V14 NEW
+
+  Drive train of the riveting rotary index table:
+        NEMA 17 stepper  ->  planetary gearbox  ->  output shaft  ->  disc
+
+  [A] NEMA 17 motor : REAL CAD.
+      Source STEP (user-supplied, real - NOT a proxy):
+          planta Schneider/NEMA 17 Motor.step
+      Converted with gmsh (OpenCASCADE) ->
+          meshes/actuators/nema17/nema17.STL  (binary, mm)
+      Mesh facts (mm, STEP frame): bbox X[-21.15,21.15] Y[-20,44]
+      Z[-21.15,26.65].  Motor axis = mesh +Y.  Body 42.3 mm square,
+      ~44 mm long (mesh Y in [-20,24]); 5 mm output shaft, ~20 mm long
+      (mesh Y in [24,44]).  Rx(pi/2) on the visual stands the motor up
+      so the shaft points world +Z (up into the gearbox).
+
+  [B] planetary gearbox : PROXY.
+      CAD search (brief 4.2 / 8): looked for a NEMA 17 planetary
+      gearbox STEP on GrabCAD, TraceParts, Thingiverse (jjrobots 1:5),
+      Printables and Lin Engineering.  Usable hits are STL-only or
+      behind logins and could not be fetched + converted head-less
+      here.  Modelled as a credible NEMA 17-compatible planetary
+      reducer: ~44 mm housing diameter, output flange, mounting
+      flange to the mesa underside.
+
+  Mounting: the drive hangs UNDER the plant table at the rotary disc
+  centre XY.  The output shaft rises through the mesa to the disc hub,
+  so it reads clearly as "the motor turns the disc".  Anchor of the
+  macro = disc-centre XY at the mesa UNDERSIDE z (default 1.160 =
+  plant table top 1.200 - thickness 0.040).  The stack is built
+  downward from there; the output shaft goes upward to z = 1.200.
+
+  Future PLC signal: DO_rotary_table_motor_index  (digital output,
+  PLC -> stepper driver, commands the 180-deg index of the disc).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="rotary_drive"
+               params="name parent xy_x xy_y mesa_bottom_z:=1.160
+                       disc_bottom_z:=1.200">
+
+    <!-- ===== anchor : disc-centre XY at the mesa underside ========= -->
+    <link name="${name}"/>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xy_x} ${xy_y} ${mesa_bottom_z}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== output shaft : mesa underside -> disc hub ============= -->
+    <xacro:property name="out_len" value="${disc_bottom_z - mesa_bottom_z + 0.020}"/>
+    <link name="${name}_output_shaft">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.009" length="${out_len}"/></geometry>
+        <material name="motor_shaft"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_output_shaft" type="fixed">
+      <parent link="${name}"/><child link="${name}_output_shaft"/>
+      <origin xyz="0 0 ${out_len/2 - 0.020}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== mounting flange bolted to the mesa underside ========== -->
+    <link name="${name}_mount_flange">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.070 0.070 0.008"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_mount_flange" type="fixed">
+      <parent link="${name}"/><child link="${name}_mount_flange"/>
+      <origin xyz="0 0 -0.004" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== planetary gearbox housing ============================= -->
+    <link name="${name}_planetary_gear">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.022" length="0.048"/></geometry>
+        <material name="gearbox_planetary"/>
+      </visual>
+      <!-- output-side flange ring -->
+      <visual>
+        <origin xyz="0 0 0.026" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.025" length="0.006"/></geometry>
+        <material name="motor_housing"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_planetary_gear" type="fixed">
+      <parent link="${name}"/><child link="${name}_planetary_gear"/>
+      <origin xyz="0 0 -0.032" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== gearbox-to-motor flange =============================== -->
+    <link name="${name}_gear_flange">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.025" length="0.006"/></geometry>
+        <material name="motor_housing"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_gear_flange" type="fixed">
+      <parent link="${name}"/><child link="${name}_gear_flange"/>
+      <origin xyz="0 0 -0.059" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== NEMA 17 stepper (REAL CAD mesh) ======================= -->
+    <!-- visual_xyz derivation (mesh in mm, scale 0.001, rpy = Rx(pi/2)):
+           Rx(pi/2)*(mx,my,mz) = (mx, -mz, my)
+           faceplate centre mesh (0, 24, 0) -> link (0, 0, 0.024)
+           we want the faceplate at anchor z = -0.062 (under the gear
+           flange):  visual_z = -0.062 - 0.024 = -0.086
+         => motor body  -> anchor z [-0.106, -0.062]
+            output shaft-> anchor z [-0.062, -0.042]  (enters the gearbox) -->
+    <link name="${name}_nema17">
+      <visual>
+        <origin xyz="0 0 -0.086" rpy="1.5707963267948966 0 0"/>
+        <geometry>
+          <mesh
+            filename="package://schneider_cell_description/meshes/actuators/nema17/nema17.STL"
+            scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="motor_can"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_nema17" type="fixed">
+      <parent link="${name}"/><child link="${name}_nema17"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

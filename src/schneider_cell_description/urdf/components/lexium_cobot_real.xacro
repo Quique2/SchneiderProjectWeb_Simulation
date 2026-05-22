@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<!--
+  lexium_cobot_real.xacro  -  V43 (new cobot URDF + integrated final gripper)
+  ===========================================================================
+  V43 INTEGRATES the user-supplied URDF
+     lexium_cobot_with_final_gripper.urdf
+  (shipped in /home/student/planta Schneider/
+   lexium_cobot_with_final_gripper_z_reference.zip)
+  as the SOLE source of truth for the cobot's kinematics + gripper.
+
+  Differences from V38..V42:
+    * Cobot URDF replaced with the new file.  Joint origins, axes, rpy,
+      joint limits and gripper geometry come from the user-supplied URDF
+      verbatim (including joint_2 rpy="0 0 0.05", which V36 had zeroed).
+    * The gripper is now PART OF the cobot URDF (5 STLs + prismatic
+      appendage_prismatic_joint + tcp_link at the working centre).  The
+      old new_gripper.xacro is NO LONGER instantiated.
+    * The cobot exposes a logical TCP frame name "${name}_tcp_grasp_center"
+      co-located with tcp_link.  The whole planta (FK, IK, object manager,
+      gripper sim, collision filter, pick/place trajectories) addresses
+      this frame as the gripper's working centre.
+
+  Geometry of the URDF is UNTOUCHED beyond:
+    (1) Removing the `world` link and `world_to_base_link_z_reference`
+        fixed joint of the user URDF, and replacing them with this
+        macro's parent->base_link joint with the floor-mount Rx(+pi/2).
+        The floor-mount rotation matches the URDF's original Z-reference
+        wrapper (Rx(+pi/2)), so q=0 still produces the same world pose.
+    (2) Prefixing every link/joint name with the instance name so multiple
+        instances do not clash.
+    (3) Adding the "${name}_tcp_grasp_center" alias on top of tcp_link.
+  ===========================================================================
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find lexium_cobot_with_final_gripper)/urdf/lexium_cobot_with_final_gripper.xacro"/>
+
+  <xacro:macro name="lexium_cobot_real"
+               params="name parent xy_x xy_y base_z yaw
+                       pedestal_height:=0.0  pedestal_radius:=0.0
+                       mount_mode:=floor">
+
+    <!-- mount_mode="floor" applies Rx(+pi/2) so the canonical CAD +Y arm
+         axis maps to world +Z.  This matches the new URDF's built-in
+         world_to_base_link_z_reference (also Rx(+pi/2)). -->
+    <xacro:property name="anchor_rx"
+                    value="${ 1.5707963267948966 if mount_mode == 'floor' else -1.5707963267948966}"/>
+    <xacro:property name="anchor_z"
+                    value="${base_z + pedestal_height}"/>
+
+    <!-- Optional pedestal column - skipped when pedestal_height = 0 -->
+    <xacro:if value="${pedestal_height > 0.0}">
+      <link name="${name}_pedestal">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <cylinder radius="${pedestal_radius}" length="${pedestal_height}"/>
+          </geometry>
+          <material name="cobot_dark"/>
+        </visual>
+      </link>
+      <joint name="${parent}_to_${name}_pedestal" type="fixed">
+        <parent link="${parent}"/>
+        <child  link="${name}_pedestal"/>
+        <origin xyz="${xy_x} ${xy_y} ${base_z + pedestal_height/2}"
+                rpy="0 0 0"/>
+      </joint>
+    </xacro:if>
+
+    <link name="${name}_anchor"/>
+    <joint name="${parent}_to_${name}_anchor" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_anchor"/>
+      <origin xyz="${xy_x} ${xy_y} ${anchor_z}"
+              rpy="${anchor_rx} 0 ${yaw}"/>
+    </joint>
+
+    <!-- Instantiate the new cobot + gripper chain at the anchor. -->
+    <xacro:lexium_cobot_with_final_gripper name="${name}"
+                                           parent="${name}_anchor"
+                                           mount_xyz="0 0 0"
+                                           mount_rpy="0 0 0"/>
+
+  </xacro:macro>
+
+</robot>

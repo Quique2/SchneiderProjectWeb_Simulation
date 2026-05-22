@@ -1,0 +1,154 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Schneider palette + neutral industrial tones used across the cell. -->
+
+  <material name="floor_mat">           <color rgba="0.28 0.30 0.34 1.00"/></material>
+  <material name="floor_grid">          <color rgba="0.40 0.42 0.46 1.00"/></material>
+
+  <material name="table_top">           <color rgba="0.78 0.78 0.80 1.00"/></material>
+  <material name="table_leg">           <color rgba="0.45 0.46 0.48 1.00"/></material>
+
+  <material name="conveyor_body">       <color rgba="0.55 0.57 0.60 1.00"/></material>
+  <material name="conveyor_band">       <color rgba="0.18 0.18 0.20 1.00"/></material>
+
+  <material name="feeder_body">         <color rgba="0.60 0.62 0.65 1.00"/></material>
+  <material name="feeder_top">          <color rgba="0.80 0.80 0.82 1.00"/></material>
+
+  <material name="bin_accept">          <color rgba="0.20 0.65 0.30 0.90"/></material>
+  <material name="bin_reject">          <color rgba="0.75 0.20 0.20 0.90"/></material>
+
+  <material name="fixture_mat">         <color rgba="0.65 0.68 0.72 1.00"/></material>
+  <!-- V42: brighter, fully saturated orange to match the live marker. -->
+  <material name="cafi_mat">            <color rgba="1.00 0.45 0.00 1.00"/></material>
+
+  <!-- V16: final rivet-fixture assembly palette
+       (base block = bare steel, body block = darker grey,
+        solenoid = anodised dark, piston = polished metal) -->
+  <material name="fixture_rivet_steel">    <color rgba="0.72 0.73 0.76 1.00"/></material>
+  <material name="fixture_rivet_body">     <color rgba="0.55 0.57 0.60 1.00"/></material>
+  <material name="fixture_rivet_solenoid"> <color rgba="0.22 0.24 0.28 1.00"/></material>
+  <material name="fixture_rivet_piston">   <color rgba="0.80 0.81 0.83 1.00"/></material>
+
+  <!-- Lexium Cobot palette: Schneider white body, dark slate joints,
+       signature Schneider green accent rings. -->
+  <material name="cobot_white">         <color rgba="0.95 0.95 0.95 1.00"/></material>
+  <material name="cobot_dark">          <color rgba="0.16 0.18 0.22 1.00"/></material>
+  <material name="cobot_mid">           <color rgba="0.40 0.42 0.46 1.00"/></material>
+  <material name="cobot_accent">        <color rgba="0.40 0.78 0.20 1.00"/></material>
+  <material name="cobot_flange">        <color rgba="0.85 0.85 0.87 1.00"/></material>
+
+  <material name="gripper_mat">         <color rgba="0.70 0.70 0.74 1.00"/></material>
+
+  <material name="camera_body_mat">     <color rgba="0.10 0.10 0.12 1.00"/></material>
+  <material name="camera_lens_mat">     <color rgba="0.30 0.50 0.65 1.00"/></material>
+  <material name="bracket_mat">         <color rgba="0.50 0.52 0.55 1.00"/></material>
+
+  <!-- Riveting station palette -->
+  <material name="station_panel">       <color rgba="0.85 0.86 0.88 1.00"/></material>
+  <material name="station_pillar">      <color rgba="0.40 0.42 0.46 1.00"/></material>
+  <material name="station_press">       <color rgba="0.22 0.24 0.28 1.00"/></material>
+  <material name="station_press_tip">   <color rgba="0.70 0.70 0.72 1.00"/></material>
+  <material name="station_tray">        <color rgba="0.35 0.37 0.40 1.00"/></material>
+  <material name="station_canopy">      <color rgba="0.65 0.67 0.70 1.00"/></material>
+
+  <!-- Plant table (V8 common platform) -->
+  <material name="plant_table_top">     <color rgba="0.82 0.83 0.85 1.00"/></material>
+  <material name="plant_table_leg">     <color rgba="0.30 0.32 0.36 1.00"/></material>
+  <material name="plant_table_frame">   <color rgba="0.40 0.42 0.46 1.00"/></material>
+
+  <!-- V9: rotary index table (riveting station) -->
+  <material name="rotary_disc_mat">     <color rgba="0.62 0.64 0.68 1.00"/></material>
+  <material name="rotary_arrow_mat">    <color rgba="0.40 0.78 0.20 1.00"/></material>
+  <material name="rotary_hub_mat">      <color rgba="0.30 0.32 0.36 1.00"/></material>
+  <material name="rotary_hub_cap_mat">  <color rgba="0.18 0.20 0.24 1.00"/></material>
+  <material name="rotary_boss_mat">     <color rgba="0.45 0.46 0.48 1.00"/></material>
+
+  <!-- V9: new_gripper part palette -->
+  <material name="new_gripper_stump_mat">     <color rgba="0.55 0.57 0.62 1.00"/></material>
+  <material name="new_gripper_neck_mat">      <color rgba="0.40 0.42 0.46 1.00"/></material>
+  <material name="new_gripper_appendage_mat"> <color rgba="0.65 0.67 0.72 1.00"/></material>
+  <material name="new_gripper_fixture_mat">   <color rgba="0.78 0.80 0.84 1.00"/></material>
+  <material name="new_gripper_fixture1_mat">  <color rgba="0.78 0.80 0.84 1.00"/></material>
+
+  <!-- V9: chair (operator seat in front of the control station) -->
+  <material name="chair_seat_mat">      <color rgba="0.18 0.20 0.24 1.00"/></material>
+  <material name="chair_back_mat">      <color rgba="0.18 0.20 0.24 1.00"/></material>
+  <material name="chair_leg_mat">       <color rgba="0.30 0.32 0.36 1.00"/></material>
+
+  <material name="lamp_red">            <color rgba="0.85 0.18 0.18 1.00"/></material>
+  <material name="lamp_amber">          <color rgba="0.95 0.65 0.10 1.00"/></material>
+  <material name="lamp_green">          <color rgba="0.20 0.78 0.30 1.00"/></material>
+
+  <!-- Control station (rack + Schneider control components) -->
+  <material name="rack_frame">          <color rgba="0.35 0.37 0.40 1.00"/></material>
+  <material name="rack_shelf">          <color rgba="0.55 0.57 0.60 1.00"/></material>
+  <material name="rack_panel">          <color rgba="0.78 0.78 0.80 1.00"/></material>
+
+  <material name="plc_body">            <color rgba="0.90 0.90 0.92 1.00"/></material>
+  <material name="plc_accent">          <color rgba="0.40 0.78 0.20 1.00"/></material>
+  <material name="plc_terminals">       <color rgba="0.15 0.16 0.18 1.00"/></material>
+
+  <material name="controller_body">     <color rgba="0.92 0.90 0.85 1.00"/></material>
+  <material name="controller_vent">     <color rgba="0.20 0.22 0.25 1.00"/></material>
+  <material name="controller_label">    <color rgba="0.20 0.55 0.30 1.00"/></material>
+
+  <material name="hmi_bezel">           <color rgba="0.10 0.11 0.13 1.00"/></material>
+  <material name="hmi_screen">          <color rgba="0.18 0.34 0.55 1.00"/></material>
+
+  <material name="pc_body">             <color rgba="0.20 0.22 0.25 1.00"/></material>
+  <material name="pc_screen">           <color rgba="0.20 0.40 0.60 1.00"/></material>
+  <material name="pc_stand">            <color rgba="0.30 0.32 0.35 1.00"/></material>
+
+  <material name="estop_red">           <color rgba="0.88 0.10 0.10 1.00"/></material>
+  <material name="estop_yellow">        <color rgba="0.95 0.78 0.10 1.00"/></material>
+  <material name="selector_dark">       <color rgba="0.18 0.20 0.24 1.00"/></material>
+  <material name="selector_knob">       <color rgba="0.55 0.57 0.60 1.00"/></material>
+
+  <!-- ================= V14 additions ================================= -->
+
+  <!-- Real Lexium Cobot CAD body (single static visual mesh) -->
+  <material name="lexium_real_body">    <color rgba="0.92 0.93 0.94 1.00"/></material>
+
+  <!-- SICK photoelectric sensors + mounting brackets -->
+  <material name="sensor_sick_body">    <color rgba="0.16 0.40 0.55 1.00"/></material>
+  <material name="sensor_beam">         <color rgba="0.95 0.25 0.20 0.45"/></material>
+  <material name="bracket_steel">       <color rgba="0.52 0.54 0.57 1.00"/></material>
+
+  <!-- Actuators: conveyor gear-motor + NEMA 17 + planetary gearbox -->
+  <material name="motor_can">           <color rgba="0.30 0.32 0.36 1.00"/></material>
+  <material name="motor_housing">       <color rgba="0.58 0.60 0.63 1.00"/></material>
+  <material name="motor_shaft">         <color rgba="0.72 0.73 0.75 1.00"/></material>
+  <material name="motor_terminal">      <color rgba="0.12 0.13 0.15 1.00"/></material>
+  <material name="gearbox_planetary">   <color rgba="0.40 0.42 0.46 1.00"/></material>
+
+  <!-- Pneumatics: gripper fittings, 25 mm cylinder, FRL unit, hoses -->
+  <material name="pneumatic_fitting">        <color rgba="0.20 0.45 0.75 1.00"/></material>
+  <material name="pneumatic_fitting_collar"> <color rgba="0.75 0.68 0.30 1.00"/></material>
+  <material name="pneumatic_cylinder">       <color rgba="0.80 0.81 0.84 1.00"/></material>
+  <material name="pneumatic_cylinder_cap">   <color rgba="0.45 0.47 0.50 1.00"/></material>
+  <material name="pneumatic_rod">            <color rgba="0.85 0.86 0.88 1.00"/></material>
+  <material name="frl_body">                 <color rgba="0.50 0.52 0.56 1.00"/></material>
+  <material name="frl_bowl">                 <color rgba="0.55 0.65 0.72 0.55"/></material>
+  <material name="frl_gauge">                <color rgba="0.90 0.91 0.92 1.00"/></material>
+  <material name="frl_knob">                 <color rgba="0.18 0.20 0.24 1.00"/></material>
+  <material name="pneumatic_hose_a">         <color rgba="0.15 0.35 0.85 1.00"/></material>
+  <material name="pneumatic_hose_b">         <color rgba="0.85 0.20 0.20 1.00"/></material>
+
+  <!-- V36: process platform (elevated steel plate over the real mesa) -->
+  <material name="process_platform_top">     <color rgba="0.72 0.74 0.78 1.00"/></material>
+  <material name="process_platform_post">    <color rgba="0.45 0.47 0.50 1.00"/></material>
+  <material name="process_platform_pad">     <color rgba="0.36 0.38 0.42 1.00"/></material>
+
+  <!-- V37: disco giratorio palette (15 STLs from disco giratorio.zip) -->
+  <material name="disco_base_mat">           <color rgba="0.65 0.66 0.70 1.00"/></material>
+  <material name="disco_bearing_mat">        <color rgba="0.40 0.42 0.46 1.00"/></material>
+  <material name="disco_stand_mat">          <color rgba="0.58 0.60 0.64 1.00"/></material>
+  <material name="disco_nema_mat">           <color rgba="0.30 0.32 0.36 1.00"/></material>
+  <material name="disco_bb_mat">             <color rgba="0.78 0.80 0.84 1.00"/></material>
+  <material name="disco_nut_mat">            <color rgba="0.25 0.27 0.30 1.00"/></material>
+  <material name="disco_face_mat">           <color rgba="0.72 0.74 0.78 1.00"/></material>
+  <material name="disco_sprocket_mat">       <color rgba="0.40 0.78 0.20 1.00"/></material>
+  <material name="disco_belt_mat">           <color rgba="0.10 0.10 0.12 1.00"/></material>
+
+</robot>

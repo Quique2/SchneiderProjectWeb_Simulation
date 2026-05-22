@@ -1,0 +1,28 @@
+
+V44 collision check (strict mode, per-joint mesa hard requirement)
+Pose                            Status  min_joint_Z  Collision report
+------------------------------------------------------------------------------------------------------------------------
+POSE_HOME                       PASS    1.0867 m
+POSE_APPROACH_CONVEYOR          PASS    1.0867 m
+POSE_PICK_CONVEYOR              PASS    1.0381 m
+POSE_LIFT_CONVEYOR              PASS    1.0867 m
+POSE_APPROACH_LOAD_FIXTURE      PASS    1.0867 m
+POSE_PLACE_LOAD_FIXTURE         PASS    1.0867 m
+POSE_RELEASE_LOAD_FIXTURE       PASS    1.0867 m
+POSE_RETREAT_LOAD_FIXTURE       PASS    1.0867 m
+POSE_APPROACH_PICK_RIVETED      PASS    1.0867 m
+POSE_PICK_RIVETED               PASS    1.0867 m
+POSE_LIFT_RIVETED               PASS    1.0867 m
+POSE_APPROACH_VISION            PASS    1.0867 m
+POSE_PLACE_VISION               PASS    1.0867 m
+POSE_RELEASE_VISION             PASS    1.0867 m
+POSE_RETREAT_VISION             PASS    1.0867 m
+POSE_APPROACH_ACCEPT_BIN        PASS    1.0867 m
+POSE_DROP_ACCEPT_BIN            PASS    1.0867 m
+POSE_APPROACH_REJECT_BIN        PASS    1.0867 m
+POSE_DROP_REJECT_BIN            PASS    1.0867 m
+
+Lowest gripper_body/tcp_tip world Z: 1.0070 m  (floor at z=0)
+Lowest joint origin Z (any joint, any pose): 1.0381 m
+Joint clearance margin: +0.0381 m above mesa_top
+Overall: PASS

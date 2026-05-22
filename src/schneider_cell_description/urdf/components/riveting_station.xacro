@@ -1,0 +1,413 @@
+<?xml version="1.0"?>
+<!--
+  riveting_station.xacro  -  V8 cabin-style riveting module
+                             V9: press callsite shifted to +0.300 (over
+                             V9 rivet mount), cabin geometry untouched.
+                             V10: press callsite RESTORED to V8 value
+                             (press_offset_y = 0.000, zone centre).  In
+                             V10 the rotary disc is repositioned so its
+                             RIVET mount coincides with the zone centre
+                             - the press is back exactly where it was
+                             in V8.  The macro itself is parameter-
+                             driven and untouched.
+
+  Reworked for V8: the cell is now built on a common plant table at
+  z = 1.20 m, and the riveting station is the integrated module that
+  sits on top of that table.  The user reference image (a riveting
+  benchtop with an integrated upper module) is the visual guide.
+
+  Approximate target dimensions taken from the reference:
+      bench (mesa) top z       1.20 m  (= plant table top, NOT drawn here)
+      module frontal width     ~ 1.00 m  (X span of the work zone)
+      module depth             ~ 0.70 m  (Y span of the work zone)
+      upper module footprint   ~ 0.70 m x 0.40 m  (the cabin canopy)
+      upper module height      ~ 0.50 m above the bench surface
+
+  Topology (all local Z values are measured from the bench surface,
+  i.e. z=0 of this macro = the plant table TOP):
+
+      0.00  bench surface (= world z = 1.20)
+       ...  work zone: rivet fixture + CAFI flat on the bench
+       ...  press tip descends from the cabin (gap ~6 cm above CAFI top)
+       ...  rivet press head + pillar inside the cabin
+      0.46  canopy underside
+      0.50  canopy top  (= world z = 1.70)
+
+  Cabin position: pushed to the BACK (north) of the work zone, leaving
+  the south half open for the cobot to approach.  The canopy is centred
+  in X but offset in Y by +(zone_size_y - cabin_size_y)/2 so its north
+  edge matches the zone's north edge.
+
+  Parent frame:  this macro expects to be attached to a link whose
+                 origin sits AT the mesa surface XY centre of the
+                 riveting zone (see schneider_cell.urdf.xacro
+                 'riveting_zone' frame).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="_cabin_post"
+               params="name parent suffix dx dy section length z_local">
+    <link name="${name}_post_${suffix}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${section} ${section} ${length}"/>
+        </geometry>
+        <material name="station_pillar"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_post_${suffix}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_post_${suffix}"/>
+      <origin xyz="${dx} ${dy} ${z_local}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="riveting_station_features"
+               params="name parent
+                       zone_size_x zone_size_y
+                       cabin_size_x cabin_size_y cabin_height
+                       press_offset_x press_offset_y
+                       include_press:=true">
+
+    <!-- ============ derived cabin layout ============================== -->
+    <xacro:property name="canopy_t"        value="0.040"/>
+    <xacro:property name="canopy_top_z"    value="${cabin_height}"/>
+    <xacro:property name="canopy_bot_z"    value="${cabin_height - canopy_t}"/>
+    <xacro:property name="canopy_ctr_z"    value="${cabin_height - canopy_t/2}"/>
+
+    <xacro:property name="cabin_x_offset"  value="0"/>
+    <xacro:property name="cabin_y_offset"
+                    value="${(zone_size_y - cabin_size_y) / 2}"/>
+
+    <xacro:property name="post_section"    value="0.030"/>
+    <xacro:property name="post_length"     value="${canopy_bot_z}"/>
+    <xacro:property name="post_ctr_z"      value="${post_length/2}"/>
+
+    <!-- ============ Cabin posts (V39: BACK ONLY) =====================
+         V38 had 4 corner posts; the SE and SW (south, front) posts
+         blocked the cobot from entering the rivet cabin to reach the
+         LOAD fixture.  V39 removes the two front posts; only the
+         NE and NW (back) posts remain, supporting the canopy from the
+         north side, and the back wall braces the structure laterally.
+         The cobot now has clear entry to LOAD from the south.       -->
+    <xacro:_cabin_post name="${name}" parent="${parent}" suffix="ne"
+                       dx="${cabin_x_offset + cabin_size_x/2}"
+                       dy="${cabin_y_offset + cabin_size_y/2}"
+                       section="${post_section}"
+                       length="${post_length}" z_local="${post_ctr_z}"/>
+    <xacro:_cabin_post name="${name}" parent="${parent}" suffix="nw"
+                       dx="${cabin_x_offset - cabin_size_x/2}"
+                       dy="${cabin_y_offset + cabin_size_y/2}"
+                       section="${post_section}"
+                       length="${post_length}" z_local="${post_ctr_z}"/>
+
+    <!-- ============ V40: back wall removed ===========================
+         V38/V39 emitted a tall gray back_panel (the "base gris que
+         estorba" the user flagged).  V40 removes it.  Lateral stability
+         is not needed in the URDF visual model.                       -->
+    <xacro:property name="back_thickness" value="0.020"/>
+    <xacro:property name="back_height"    value="${post_length - 0.010}"/>
+
+    <!-- ============ top canopy plate ================================= -->
+    <link name="${name}_canopy">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${cabin_size_x} ${cabin_size_y} ${canopy_t}"/>
+        </geometry>
+        <material name="station_canopy"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_canopy" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_canopy"/>
+      <origin xyz="${cabin_x_offset} ${cabin_y_offset} ${canopy_ctr_z}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- thin lip running around the canopy edge (cosmetic) -->
+    <xacro:property name="lip_t" value="0.010"/>
+    <xacro:property name="lip_h" value="0.012"/>
+    <link name="${name}_canopy_lip_n">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${cabin_size_x} ${lip_t} ${lip_h}"/>
+        </geometry>
+        <material name="station_pillar"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_canopy_lip_n" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_canopy_lip_n"/>
+      <origin xyz="${cabin_x_offset}
+                   ${cabin_y_offset + cabin_size_y/2 - lip_t/2}
+                   ${canopy_top_z + lip_h/2}"
+              rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_canopy_lip_s">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${cabin_size_x} ${lip_t} ${lip_h}"/>
+        </geometry>
+        <material name="station_pillar"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_canopy_lip_s" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_canopy_lip_s"/>
+      <origin xyz="${cabin_x_offset}
+                   ${cabin_y_offset - cabin_size_y/2 + lip_t/2}
+                   ${canopy_top_z + lip_h/2}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ press pillar / head / tip (V19: only emitted when
+         include_press=true; V19 uses the rivet_final assembly as the
+         real press, mounted on its own stand at the RIVET station). === -->
+    <xacro:if value="${include_press}">
+    <xacro:property name="pillar_r"       value="0.030"/>
+    <xacro:property name="pillar_h"       value="0.160"/>
+    <xacro:property name="pillar_top_z"   value="${canopy_bot_z}"/>
+    <xacro:property name="pillar_ctr_z"   value="${pillar_top_z - pillar_h/2}"/>
+    <xacro:property name="pillar_bot_z"   value="${pillar_top_z - pillar_h}"/>
+
+    <link name="${name}_press_pillar">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${pillar_r}" length="${pillar_h}"/>
+        </geometry>
+        <material name="station_pillar"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_press_pillar" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_press_pillar"/>
+      <origin xyz="${press_offset_x} ${press_offset_y} ${pillar_ctr_z}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ press head ======================================= -->
+    <xacro:property name="head_r"       value="0.045"/>
+    <xacro:property name="head_h"       value="0.130"/>
+    <xacro:property name="head_top_z"   value="${pillar_bot_z}"/>
+    <xacro:property name="head_ctr_z"   value="${head_top_z - head_h/2}"/>
+    <xacro:property name="head_bot_z"   value="${head_top_z - head_h}"/>
+
+    <link name="${name}_press_head">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${head_r}" length="${head_h}"/>
+        </geometry>
+        <material name="station_press"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_press_head" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_press_head"/>
+      <origin xyz="${press_offset_x} ${press_offset_y} ${head_ctr_z}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ press tip (the part that hits the rivet) ========== -->
+    <xacro:property name="tip_r"       value="0.012"/>
+    <xacro:property name="tip_h"       value="0.040"/>
+    <xacro:property name="tip_top_z"   value="${head_bot_z}"/>
+    <xacro:property name="tip_ctr_z"   value="${tip_top_z - tip_h/2}"/>
+
+    <link name="${name}_press_tip">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${tip_r}" length="${tip_h}"/>
+        </geometry>
+        <material name="station_press_tip"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_press_tip" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_press_tip"/>
+      <origin xyz="${press_offset_x} ${press_offset_y} ${tip_ctr_z}"
+              rpy="0 0 0"/>
+    </joint>
+    </xacro:if>
+
+    <!-- ============ stack light (3 lamps on the canopy top) =========== -->
+    <xacro:property name="stack_x"  value="${cabin_x_offset - cabin_size_x/2 + 0.060}"/>
+    <xacro:property name="stack_y"  value="${cabin_y_offset}"/>
+    <xacro:property name="stack_base_z"
+                    value="${canopy_top_z + lip_h + 0.005}"/>
+
+    <link name="${name}_stack_post">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.012" length="0.150"/>
+        </geometry>
+        <material name="station_pillar"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_stack" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_stack_post"/>
+      <origin xyz="${stack_x} ${stack_y} ${stack_base_z + 0.075}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_lamp_red">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.020"/></geometry>
+        <material name="lamp_red"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_lamp_red" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_lamp_red"/>
+      <origin xyz="${stack_x} ${stack_y} ${stack_base_z + 0.150}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_lamp_amber">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.020"/></geometry>
+        <material name="lamp_amber"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_lamp_amber" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_lamp_amber"/>
+      <origin xyz="${stack_x} ${stack_y} ${stack_base_z + 0.105}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_lamp_green">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><sphere radius="0.020"/></geometry>
+        <material name="lamp_green"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_lamp_green" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_lamp_green"/>
+      <origin xyz="${stack_x} ${stack_y} ${stack_base_z + 0.060}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ tool tray bolted to the back wall (south face) ==== -->
+    <xacro:property name="tray_x"  value="${cabin_x_offset + cabin_size_x/2 - 0.180}"/>
+    <xacro:property name="tray_y"  value="${cabin_y_offset + cabin_size_y/2 - back_thickness - 0.075}"/>
+    <xacro:property name="tray_z"  value="${0.180}"/>
+
+    <link name="${name}_tray">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.280 0.130 0.040"/>
+        </geometry>
+        <material name="station_tray"/>
+      </visual>
+      <visual>
+        <origin xyz="0 0.060 0.025" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.280 0.008 0.050"/>
+        </geometry>
+        <material name="station_tray"/>
+      </visual>
+      <visual>
+        <origin xyz="0 -0.060 0.025" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.280 0.008 0.050"/>
+        </geometry>
+        <material name="station_tray"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_tray" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_tray"/>
+      <origin xyz="${tray_x} ${tray_y} ${tray_z}" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+  <!-- ====================================================================
+       V40 rivet gun ("pistolita"): a hand-held pneumatic rivet gun fixed
+       to the RIVET station, pointing down at the rivet mount fixture.
+       Used as the visible riveting actuator (the V19 "press" macro was
+       a generic stand+head+tip).  Mounted on a small bracket so the
+       handle/body do not collide with the disc or the cobot.
+  ==================================================================== -->
+  <xacro:macro name="rivet_gun"
+               params="name parent xyz rpy:='0 0 0'">
+    <!-- bracket: short horizontal plate hanging from the cabin frame -->
+    <link name="${name}_bracket">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.060 0.040 0.020"/>
+        </geometry>
+        <material name="station_pillar"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_bracket" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_bracket"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+
+    <!-- pneumatic body (cylinder) hanging below the bracket -->
+    <link name="${name}_body">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.030" length="0.140"/>
+        </geometry>
+        <material name="station_press"/>
+      </visual>
+    </link>
+    <joint name="${name}_bracket_to_body" type="fixed">
+      <parent link="${name}_bracket"/>
+      <child  link="${name}_body"/>
+      <origin xyz="0 0 -0.080" rpy="0 0 0"/>
+    </joint>
+
+    <!-- pistol grip handle -->
+    <link name="${name}_grip">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.025 0.040 0.085"/>
+        </geometry>
+        <material name="station_press"/>
+      </visual>
+    </link>
+    <joint name="${name}_body_to_grip" type="fixed">
+      <parent link="${name}_body"/>
+      <child  link="${name}_grip"/>
+      <origin xyz="0 -0.045 -0.030" rpy="-0.35 0 0"/>
+    </joint>
+
+    <!-- punch tip (the rivet contact element) -->
+    <link name="${name}_tip">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.008" length="0.050"/>
+        </geometry>
+        <material name="station_press_tip"/>
+      </visual>
+    </link>
+    <joint name="${name}_body_to_tip" type="fixed">
+      <parent link="${name}_body"/>
+      <child  link="${name}_tip"/>
+      <origin xyz="0 0 -0.095" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

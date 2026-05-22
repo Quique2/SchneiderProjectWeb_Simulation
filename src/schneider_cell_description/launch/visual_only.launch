@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- V30 visual smoke test of the full cell URDF.
+       robot_description + joint_state_publisher_gui + robot_state_publisher + RViz. -->
+
+  <arg name="model"
+       default="$(find schneider_cell_description)/urdf/schneider_cell.urdf.xacro"/>
+  <arg name="rviz_config"
+       default="$(find schneider_cell_description)/config/view_cell.rviz"/>
+
+  <param name="robot_description"
+         command="$(find xacro)/xacro --inorder $(arg model)"/>
+
+  <node name="joint_state_publisher_gui"
+        pkg="joint_state_publisher_gui"
+        type="joint_state_publisher_gui"
+        output="screen"/>
+
+  <node name="robot_state_publisher"
+        pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        output="screen"/>
+
+  <node name="rviz" pkg="rviz" type="rviz"
+        args="-d $(arg rviz_config)"
+        output="screen"/>
+</launch>

@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<!--
+  workstation.xacro  -  V3 compact bench
+
+  Thin top plate + 4 short legs. All XY/footprint values still come from
+  scene_dimensions.yaml; this file only draws the visual primitives.
+
+  V3 tweaks: thinner plate (0.04 m), legs slimmer (0.025 m radius).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="_table_leg"
+               params="name parent suffix dx dy leg_radius leg_length
+                       top_z thickness">
+    <link name="${name}_leg_${suffix}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${leg_radius}" length="${leg_length}"/>
+        </geometry>
+        <material name="table_leg"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_leg_${suffix}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_leg_${suffix}"/>
+      <origin xyz="${dx} ${dy} ${-(thickness/2) - leg_length/2}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="workstation_table"
+               params="name parent xy_x xy_y size_x size_y
+                       top_z thickness leg_radius leg_inset
+                       support_z:='0.0'">
+
+    <!-- V8 addition: support_z is the world Z below the table that the
+         legs reach down to (default 0 = floor).  When this table is
+         sitting on the plant table at z=1.20, pass support_z=1.20 so
+         the legs become zero-length and the plate sits flat on the
+         plant table top.  Old V7 callsites (no support_z) keep working. -->
+    <xacro:property name="leg_len" value="${top_z - thickness - support_z}"/>
+
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${size_x} ${size_y} ${thickness}"/>
+        </geometry>
+        <material name="table_top"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xy_x} ${xy_y} ${top_z - thickness/2}" rpy="0 0 0"/>
+    </joint>
+
+    <xacro:if value="${leg_len > 0.001}">
+      <xacro:_table_leg name="${name}" parent="${name}" suffix="px_py"
+                        dx="${ size_x/2 - leg_inset}" dy="${ size_y/2 - leg_inset}"
+                        leg_radius="${leg_radius}" leg_length="${leg_len}"
+                        top_z="${top_z}" thickness="${thickness}"/>
+      <xacro:_table_leg name="${name}" parent="${name}" suffix="px_ny"
+                        dx="${ size_x/2 - leg_inset}" dy="${-size_y/2 + leg_inset}"
+                        leg_radius="${leg_radius}" leg_length="${leg_len}"
+                        top_z="${top_z}" thickness="${thickness}"/>
+      <xacro:_table_leg name="${name}" parent="${name}" suffix="nx_py"
+                        dx="${-size_x/2 + leg_inset}" dy="${ size_y/2 - leg_inset}"
+                        leg_radius="${leg_radius}" leg_length="${leg_len}"
+                        top_z="${top_z}" thickness="${thickness}"/>
+      <xacro:_table_leg name="${name}" parent="${name}" suffix="nx_ny"
+                        dx="${-size_x/2 + leg_inset}" dy="${-size_y/2 + leg_inset}"
+                        leg_radius="${leg_radius}" leg_length="${leg_len}"
+                        top_z="${top_z}" thickness="${thickness}"/>
+    </xacro:if>
+
+  </xacro:macro>
+
+</robot>

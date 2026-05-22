@@ -1,0 +1,345 @@
+<?xml version="1.0"?>
+<!--
+  control_station.xacro  -  V7 (industrial workbench / banco técnico)
+
+  Replaces the V6 vertical rack with a low industrial bench inspired by
+  the user's reference photo (Mercado Libre D_NQ_NP_952634...):
+      - 4 corner legs supporting a horizontal worktop at 0.75 m
+      - low shelf under the desk for the cobot controller
+      - vertical back panel rising above the rear of the worktop
+        (PLC and HMI panel-mounted on it, facing the operator)
+      - monitor + mini-PC sitting on the worktop, left side
+      - E-stop and selector switch on the worktop, right side
+      - top valance / light fixture on the back panel
+
+  Local frame: origin at floor level center of the footprint,
+  X=east, Y=north.  With yaw=0 the back panel faces +Y and the
+  operator stands on the -Y (south) side.
+
+  Components:
+      Modicon M262 PLC      TM262L10MESE8T   125 x 100 x 90 mm
+      Lexium controller     LXMRL03C1000     410 x 307 x 235 mm
+      Harmony ST6 HMI       HMIST6400        208 x 153 x  45 mm
+      Generic mini PC                        220 x 160 x  55 mm  (proxy)
+      Selector switch       XB5AD21          22 mm mount, 30 mm head
+      Emergency stop        XB5AS9442        40 mm head, 22 mm mount
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="control_station"
+               params="name parent xy_x xy_y yaw
+                       width depth height">
+
+    <!-- root anchor on the floor -->
+    <link name="${name}_root"/>
+    <joint name="${parent}_to_${name}_root" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_root"/>
+      <origin xyz="${xy_x} ${xy_y} 0" rpy="0 0 ${yaw}"/>
+    </joint>
+
+    <!-- ============ Bench parameters =============================== -->
+    <!-- V14: desk top RAISED from 0.720 to 0.800 m (= 80 cm) per the
+         brief (section 5 / 7) - the operation/HMI table must be at
+         0.80 m.  Every derived height below (worktop, back panel, PLC,
+         HMI, monitor, mini-PC, e-stop, selector, controller, valance,
+         leg length) follows this single property and rescales
+         automatically.  The operator chair seat is raised to 0.500 m
+         at the top-level callsite to stay coherent (~30 cm seat-to-desk
+         gap).
+         History: V10 lowered it 0.750 -> 0.720; V14 corrects it to
+         0.800. -->
+    <xacro:property name="desk_top_z"   value="0.800"/>
+    <xacro:property name="desk_top_t"   value="0.030"/>
+    <xacro:property name="leg_r"        value="0.020"/>
+    <xacro:property name="shelf_t"      value="0.018"/>
+    <xacro:property name="shelf_low_z"  value="0.050"/>
+    <xacro:property name="back_t"       value="0.025"/>
+    <xacro:property name="back_h"       value="${height - desk_top_z}"/>
+    <xacro:property name="back_cy"      value="${ depth/2 - back_t/2}"/>
+    <xacro:property name="back_south_y" value="${ back_cy - back_t/2}"/>
+
+    <!-- ============ Four corner legs =============================== -->
+    <xacro:macro name="_leg" params="suffix x y">
+      <link name="${name}_leg_${suffix}">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry><cylinder radius="${leg_r}" length="${desk_top_z}"/></geometry>
+          <material name="rack_frame"/>
+        </visual>
+      </link>
+      <joint name="${name}_to_leg_${suffix}" type="fixed">
+        <parent link="${name}_root"/>
+        <child  link="${name}_leg_${suffix}"/>
+        <origin xyz="${x} ${y} ${desk_top_z/2}" rpy="0 0 0"/>
+      </joint>
+    </xacro:macro>
+
+    <xacro:_leg suffix="ff" x="${ width/2 - leg_r}" y="${-depth/2 + leg_r}"/>
+    <xacro:_leg suffix="fb" x="${-width/2 + leg_r}" y="${-depth/2 + leg_r}"/>
+    <xacro:_leg suffix="bf" x="${ width/2 - leg_r}" y="${ depth/2 - leg_r}"/>
+    <xacro:_leg suffix="bb" x="${-width/2 + leg_r}" y="${ depth/2 - leg_r}"/>
+
+    <!-- ============ Horizontal worktop ============================= -->
+    <link name="${name}_worktop">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${width} ${depth} ${desk_top_t}"/>
+        </geometry>
+        <material name="rack_shelf"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_worktop" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_worktop"/>
+      <origin xyz="0 0 ${desk_top_z - desk_top_t/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Lower shelf (under desk) ====================== -->
+    <link name="${name}_shelf_low">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${width - 2*leg_r} ${depth - 2*leg_r} ${shelf_t}"/>
+        </geometry>
+        <material name="rack_shelf"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_shelf_low" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_shelf_low"/>
+      <origin xyz="0 0 ${shelf_low_z + shelf_t/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Back upright panel ============================ -->
+    <link name="${name}_back_panel">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${width} ${back_t} ${back_h}"/>
+        </geometry>
+        <material name="rack_panel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_back_panel" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_back_panel"/>
+      <origin xyz="0 ${back_cy} ${desk_top_z + back_h/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Top valance / lamp fixture above the back panel -->
+    <link name="${name}_valance">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${width} 0.060 0.035"/></geometry>
+        <material name="lamp_amber"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_valance" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_valance"/>
+      <origin xyz="0 ${back_cy - 0.030 - back_t/2} ${height - 0.0175}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Lexium controller LXMRL03C1000 (under desk) === -->
+    <xacro:property name="ctl_w" value="0.410"/>
+    <xacro:property name="ctl_d" value="0.235"/>
+    <xacro:property name="ctl_h" value="0.307"/>
+    <xacro:property name="ctl_z_base" value="${shelf_low_z + shelf_t}"/>
+
+    <link name="${name}_lexium_controller">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${ctl_w} ${ctl_d} ${ctl_h}"/></geometry>
+        <material name="controller_body"/>
+      </visual>
+      <visual>
+        <origin xyz="0 ${-ctl_d/2 - 0.001} 0" rpy="0 0 0"/>
+        <geometry><box size="${ctl_w * 0.70} 0.003 ${ctl_h * 0.45}"/></geometry>
+        <material name="controller_vent"/>
+      </visual>
+      <visual>
+        <origin xyz="${ctl_w/2 - 0.060} 0 ${ctl_h/2 + 0.001}" rpy="0 0 0"/>
+        <geometry><box size="0.105 0.030 0.002"/></geometry>
+        <material name="controller_label"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_lexium_controller" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_lexium_controller"/>
+      <origin xyz="0 0 ${ctl_z_base + ctl_h/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Modicon M262 PLC (back panel, LEFT half) ====== -->
+    <xacro:property name="plc_w" value="0.125"/>
+    <xacro:property name="plc_h" value="0.100"/>
+    <xacro:property name="plc_d" value="0.090"/>
+    <xacro:property name="plc_z" value="${desk_top_z + back_h*0.65}"/>
+    <xacro:property name="plc_face_y" value="${back_south_y - plc_d/2}"/>
+
+    <link name="${name}_modicon_m262">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${plc_w} ${plc_d} ${plc_h}"/></geometry>
+        <material name="plc_body"/>
+      </visual>
+      <visual>
+        <origin xyz="0 0 ${plc_h/2 - 0.005}" rpy="0 0 0"/>
+        <geometry><box size="${plc_w} ${plc_d} 0.010"/></geometry>
+        <material name="plc_accent"/>
+      </visual>
+      <visual>
+        <origin xyz="0 ${-plc_d/2 - 0.0015} ${-plc_h/2 + 0.018}" rpy="0 0 0"/>
+        <geometry><box size="${plc_w} 0.003 0.026"/></geometry>
+        <material name="plc_terminals"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_modicon_m262" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_modicon_m262"/>
+      <origin xyz="${-width/4} ${plc_face_y} ${plc_z}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Harmony ST6 HMI (back panel, RIGHT half) ====== -->
+    <xacro:property name="hmi_w"   value="0.208"/>
+    <xacro:property name="hmi_h"   value="0.153"/>
+    <xacro:property name="hmi_d"   value="0.045"/>
+    <xacro:property name="hmi_z"   value="${desk_top_z + back_h*0.50}"/>
+    <xacro:property name="hmi_face_y" value="${back_south_y - hmi_d/2}"/>
+
+    <link name="${name}_hmi_st6">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${hmi_w} ${hmi_d} ${hmi_h}"/></geometry>
+        <material name="hmi_bezel"/>
+      </visual>
+      <visual>
+        <origin xyz="0 ${-hmi_d/2 - 0.001} 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${hmi_w * 0.92} 0.002 ${hmi_h * 0.78}"/>
+        </geometry>
+        <material name="hmi_screen"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_hmi_st6" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_hmi_st6"/>
+      <origin xyz="${ width/4} ${hmi_face_y} ${hmi_z}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Mini-PC tower on worktop, LEFT-back =========== -->
+    <xacro:property name="pc_w" value="0.220"/>
+    <xacro:property name="pc_d" value="0.160"/>
+    <xacro:property name="pc_h" value="0.055"/>
+    <xacro:property name="pc_x" value="${-width/4}"/>
+    <xacro:property name="pc_y" value="${ depth/2 - back_t - pc_d/2 - 0.010}"/>
+    <xacro:property name="pc_z" value="${desk_top_z + pc_h/2}"/>
+
+    <link name="${name}_mini_pc">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${pc_w} ${pc_d} ${pc_h}"/></geometry>
+        <material name="pc_body"/>
+      </visual>
+      <visual>
+        <origin xyz="${pc_w/2 - 0.010} ${-pc_d/2 - 0.0015} 0" rpy="0 0 0"/>
+        <geometry><box size="0.008 0.003 0.008"/></geometry>
+        <material name="lamp_green"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_mini_pc" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_mini_pc"/>
+      <origin xyz="${pc_x} ${pc_y} ${pc_z}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Monitor on worktop, LEFT-front ================ -->
+    <xacro:property name="mon_w"      value="0.330"/>
+    <xacro:property name="mon_h"      value="0.210"/>
+    <xacro:property name="mon_d"      value="0.030"/>
+    <xacro:property name="mon_x"      value="${-width/4 + 0.020}"/>
+    <xacro:property name="mon_y"      value="${ pc_y - pc_d/2 - mon_d/2 - 0.010}"/>
+    <xacro:property name="mon_z_base" value="${desk_top_z + 0.020}"/>
+
+    <link name="${name}_pc_monitor">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${mon_w} ${mon_d} ${mon_h}"/></geometry>
+        <material name="pc_body"/>
+      </visual>
+      <visual>
+        <origin xyz="0 ${-mon_d/2 - 0.0015} 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${mon_w * 0.92} 0.003 ${mon_h * 0.86}"/>
+        </geometry>
+        <material name="pc_screen"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_pc_monitor" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_pc_monitor"/>
+      <origin xyz="${mon_x} ${mon_y} ${mon_z_base + mon_h/2}" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_pc_stand">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.012" length="0.020"/></geometry>
+        <material name="pc_stand"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_pc_stand" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_pc_stand"/>
+      <origin xyz="${mon_x} ${mon_y} ${desk_top_z + 0.010}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ E-stop on worktop, RIGHT-front ================ -->
+    <link name="${name}_estop">
+      <visual>
+        <origin xyz="0 0 0.020" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.020" length="0.040"/></geometry>
+        <material name="estop_red"/>
+      </visual>
+      <visual>
+        <origin xyz="0 0 0.005" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.024" length="0.010"/></geometry>
+        <material name="estop_yellow"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_estop" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_estop"/>
+      <origin xyz="${ width/2 - 0.055}
+                   ${-depth/2 + 0.060}
+                   ${desk_top_z}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ Selector switch on worktop, RIGHT-mid ========= -->
+    <link name="${name}_selector">
+      <visual>
+        <origin xyz="0 0 0.005" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.014" length="0.010"/></geometry>
+        <material name="selector_dark"/>
+      </visual>
+      <visual>
+        <origin xyz="0 0 0.012" rpy="0 ${pi/6} 0"/>
+        <geometry><box size="0.024 0.005 0.006"/></geometry>
+        <material name="selector_knob"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_selector" type="fixed">
+      <parent link="${name}_root"/>
+      <child  link="${name}_selector"/>
+      <origin xyz="${ width/2 - 0.055}
+                   ${-depth/2 + 0.140}
+                   ${desk_top_z}"
+              rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

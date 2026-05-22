@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>lexium_cobot_with_final_gripper</name>
+  <version>1.0.0</version>
+  <description>Lexium Cobot URDF with final gripper mounted at flange center.</description>
+  <maintainer email="miguelordonez681@gmail.com">Miguel Ordonez</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>xacro</exec_depend>
+</package>

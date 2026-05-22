@@ -1,0 +1,224 @@
+<?xml version="1.0"?>
+<!--
+  new_gripper.xacro  -  V40 (centroid-precise plate alignment)
+
+  V40 fix vs V39:
+    V36-V39 assumed the round 64 mm mounting circle was at the STL
+    bbox centre (mesh X=172.206, Z=71.150).  Actually the centroid
+    of the 62 vertices forming the Ø64 mm outer ring is at
+    (172.722, 71.150); the bbox is +0.516 mm biased in -X by an
+    internal cavity/slot in the stump STL.  V40 uses the centroid-
+    precise mount_xyz so the plate circle is concentric with the
+    cobot flange to within 0.05 mm.
+
+  Numerical proof (centroid of Ø64 outer circle):
+    mesh centroid:           (172.7219, 83.2744, 71.1500) mm
+    after Rx(-pi/2) + VIS:    link (+0.00072, -0.01385, -0.00027)
+    target in tool0 frame:    (0, 0, 0)  (plate face flush at flange)
+    mount T(mount_xyz)*Rz(pi):
+      T(+0.00072, -0.01385, +0.00027) * Rz(pi) * (+0.00072, -0.01385, -0.00027)
+      = T(...) * (-0.00072, +0.01385, -0.00027)
+      = (0, 0, 0)   exact within sub-mm
+
+  Geometric trade-off (preserved): the gripper's intrinsic design
+  places the GRASP CENTER 14 mm offset in link Y from the plate
+  centre.  In tool0 frame, grasp_center sits at (-0.00072, -0.01389,
+  +0.025).  V40 documents this off-axis grasp; the IK targets land
+  at the part centre by construction (resolve_poses uses
+  GRASP_CENTER_OFFSET so any non-zero offset is absorbed into the
+  joint solution).
+
+  V28 (preserved): 5 STLs, single DOF prismatic appendage joint,
+  collision envelopes per fixed sub-part.
+  ===========================================================================
+  USER BRIEF (section B)
+  ===========================================================================
+  - 5 STLs unchanged (planta Schneider finalgripper - *):
+      appendage  (moves)
+      fixture, fixture1, neck, stump  (FIXED in gripper_base)
+  - Single DOF prismatic joint, gripper_base_jaw_joint name preserved.
+  - mesh-Y CAD vertical -> world Z at HOME via Rx(-pi/2) assembly mount.
+  - mesh -Z close direction -> link -Y axis after Rx(-pi/2).
+  - gripper_mount_frame intermediate link between tool0 and gripper_base
+    so the mount can be tuned without touching the assembly.
+
+  V28 changes vs V27
+  ===========================================================================
+  - Added COLLISION elements to gripper_base and gripper_appendage_link
+    so safe_joint_filter (and any future MoveIt planner) sees the gripper
+    as a physical obstacle, not just a visual.
+  - gripper_base collision envelopes are tight boxes per fixed sub-part
+    (stump, fixture+fixture1, neck) so the safe filter does not flag
+    spurious self-collision with the cobot wrist.
+  - Removed the unnecessary mount_rpy parameter (it was always (0,0,0)
+    after V27 - the assembly rotation lives in ASSEMBLY_RPY).
+  - GRIPPER_VIS_XYZ unchanged: the 5 STLs share the same assembly
+    frame (per user "no los recentres individualmente").
+
+  Mesh -> link bboxes (verified by analyze_gripper_meshes after
+  Rx(-pi/2) + GRIPPER_VIS_XYZ = (-0.172, -0.085, 0.083)):
+      stump      X[-0.032,+0.032] Y[-0.046,+0.018] Z[-0.000,+0.006]
+      fixture    X[-0.010,+0.015] Y[-0.084,+0.086] Z[+0.006,+0.083]
+      fixture1   X[-0.015,-0.010] Y[-0.084,+0.086] Z[+0.006,+0.043]
+      neck       X[-0.010,+0.010] Y[+0.016,+0.036] Z[+0.010,+0.039]
+      appendage  X[-0.009,+0.010] Y[+0.036,+0.056] Z[+0.015,+0.080]
+
+  Joint axis derivation (mesh -Z is close direction per user [7]):
+      R_x(-pi/2) * (0,0,-1) = (0,-1,0)
+      => axis xyz="0 -1 0"
+      => limits [-0.030, 0.000] (30 mm stroke)
+      => OPEN at jaw_pos=-0.030 (appendage at link +Y)
+      => CLOSED at jaw_pos=0.000 (appendage at assembly rest)
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:property name="GRIPPER_VIS_XYZ" value="-0.172000 -0.085000 0.083000"/>
+  <xacro:property name="ASSEMBLY_RPY" value="-1.5707963267948966 0 0"/>
+
+  <xacro:macro name="new_gripper"
+               params="name parent mount_rpy:='0 0 0'
+                       mount_xyz:='0 0 0'
+                       mount_yaw:='3.141592653589793'">
+
+    <!-- ====== Intermediate clean mount frame =========================
+         tool0 -> gripper_mount_frame -> gripper_base
+         mount_yaw flips the link Z axis so the gripper visuals end up
+         with the housing hanging BELOW the wrist at HOME (where
+         tool0 +Z points world -Z and we want the gripper body to
+         extend in world -Z direction).
+
+         V34: added mount_xyz parameter so the EXTERNAL mount transform
+         tool0 -> gripper_mount_frame can apply a small XYZ translation
+         to centre the gripper visually on the flange axis.  The
+         canonical URDF's tool0 is NOT touched; we only nudge the
+         gripper's link origin in the parent tool0 frame. -->
+    <link name="${name}_mount_frame"/>
+    <joint name="${parent}_to_${name}_mount_frame" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_mount_frame"/>
+      <origin xyz="${mount_xyz}" rpy="0 0 ${mount_yaw}"/>
+    </joint>
+
+    <!-- ====== gripper_base (FIXED housing: stump+neck+fixture+fixture1) ====
+         All 4 fixed visuals share the SAME assembly transform.  Per the
+         user brief "no los recentres individualmente". -->
+    <link name="${name}">
+      <!-- Visuals: 4 STLs that do NOT move -->
+      <visual>
+        <origin xyz="${GRIPPER_VIS_XYZ}" rpy="${ASSEMBLY_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/gripper_new/new_gripper_stump.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="new_gripper_stump_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${GRIPPER_VIS_XYZ}" rpy="${ASSEMBLY_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/gripper_new/new_gripper_neck.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="new_gripper_neck_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${GRIPPER_VIS_XYZ}" rpy="${ASSEMBLY_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/gripper_new/new_gripper_fixture.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="new_gripper_fixture_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${GRIPPER_VIS_XYZ}" rpy="${ASSEMBLY_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/gripper_new/new_gripper_fixture1.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="new_gripper_fixture1_mat"/>
+      </visual>
+
+      <!-- COLLISION envelopes for the FIXED parts (V28).
+           Tight boxes per sub-part so the safe_joint_filter does not
+           treat the gripper as one giant sphere.  Each box is in the
+           link frame centered on the visual bbox center. -->
+      <!-- stump (mounting plate): X 64, Y 64, Z 6 -->
+      <collision>
+        <origin xyz="0.000 -0.014 0.003" rpy="0 0 0"/>
+        <geometry><box size="0.064 0.064 0.006"/></geometry>
+      </collision>
+      <!-- fixture (housing): X 25, Y 170, Z 77 (centered at link 0.001, 0, 0.044) -->
+      <collision>
+        <origin xyz="0.003 0.001 0.044" rpy="0 0 0"/>
+        <geometry><box size="0.025 0.170 0.077"/></geometry>
+      </collision>
+      <!-- fixture1 (thin blade alongside housing): X 5, Y 170, Z 37 -->
+      <collision>
+        <origin xyz="-0.012 0.001 0.024" rpy="0 0 0"/>
+        <geometry><box size="0.005 0.170 0.037"/></geometry>
+      </collision>
+      <!-- neck (small block above housing): X 20, Y 20, Z 30 -->
+      <collision>
+        <origin xyz="0.000 0.026 0.024" rpy="0 0 0"/>
+        <geometry><box size="0.020 0.020 0.030"/></geometry>
+      </collision>
+    </link>
+
+    <joint name="${name}_mount_frame_to_${name}" type="fixed">
+      <parent link="${name}_mount_frame"/>
+      <child  link="${name}"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ====== gripper_appendage_link (MOVING: appendage only) ========= -->
+    <link name="${name}_appendage_link">
+      <visual>
+        <origin xyz="${GRIPPER_VIS_XYZ}" rpy="${ASSEMBLY_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/gripper_new/new_gripper_appendage.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="new_gripper_appendage_mat"/>
+      </visual>
+      <!-- appendage collision envelope (V28): X 20, Y 20, Z 65 -->
+      <collision>
+        <origin xyz="0.000 0.046 0.047" rpy="0 0 0"/>
+        <geometry><box size="0.020 0.020 0.065"/></geometry>
+      </collision>
+    </link>
+
+    <!-- Prismatic joint - the ONLY moving joint of the gripper.
+         axis (0,-1,0): mesh -Z (close direction) under Rx(-pi/2)
+         maps to link -Y (see header).  Stroke 30 mm. -->
+    <joint name="${name}_jaw_joint" type="prismatic">
+      <parent link="${name}"/>
+      <child  link="${name}_appendage_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 -1 0"/>
+      <limit lower="-0.030" upper="0.000"
+             effort="20.0" velocity="0.50"/>
+      <dynamics damping="0.5" friction="0.1"/>
+    </joint>
+
+    <!-- V42: grasp_center moved INTO the physical gripping zone where
+         the appendage and fixture1 jaws close around a part.  V26-V41
+         had grasp_center at link (0, 0, +0.025) which is in the housing
+         body, NOT between the jaws.  Result: at attach the CAFI was
+         placed AT that point and the gripper visuals were OUTSIDE the
+         CAFI on one side; "el gripper atraviesa el CAFI" per user.
+         New position is at the geometric centre of the closing zone:
+            appendage closed bbox  X[-0.009,+0.010] Y[+0.036,+0.056] Z[+0.015,+0.080]
+            fixture1 (fixed blade) X[-0.015,-0.010] Y[-0.084,+0.086] Z[+0.006,+0.043]
+            grip zone centre    -> link (-0.005, +0.046, +0.029)
+         At this point the CAFI sits naturally between the visible jaws
+         and the gripper bodies are on the OUTSIDE of the CAFI footprint.
+         IK targets are re-resolved against this new offset.            -->
+    <link name="${name}_grasp_center"/>
+    <joint name="${name}_to_grasp_center" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_grasp_center"/>
+      <origin xyz="-0.005 +0.046 +0.029" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

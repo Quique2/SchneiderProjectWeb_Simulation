@@ -1,0 +1,278 @@
+<?xml version="1.0"?>
+<!--
+  rotary_index_table_v37.xacro  -  V37 disco giratorio rebuilt from the
+                                   user's "disco giratorio.zip" STL pack.
+  ===========================================================================
+  V37 replaces the V18..V36 primitive cylinder disc with a faithful STL
+  reconstruction of the rivet disco giratorio (15 STL parts).
+
+  STL inventory (15 files, package://schneider_cell_description/meshes/
+  disco_giratorio/...):
+     FIXED group (13 STL, attached to ${name}_base_link):
+        gearbase_1            (base plate 530 x 500 x 3 mm)
+        bearingbase_1         (central bearing housing 55x55x48)
+        bearingstand_1/2/3    (3 perimeter stands 25..52 x 40..55 x 69)
+        nemabase_1            (NEMA motor base 70x70x45)
+        ballbearing_1/2/3/5   (4 ball bearings 28..28x8..28x28..)
+        bearingnut_1/2/4      (3 nuts 4..16 x 11..16 x 16)
+     ROTATING group (2 STL, attached to ${name}_disc_axis):
+        disco_1               (the rotating disc face, 400 dia x 3)
+        bearingsprocket_1     (drive sprocket 52x52x37, turns with disc)
+
+  Y_CAD -> Z_ROS axis conversion:
+  ==========
+  The user's directive is "el eje de referencia esta en Y_CAD; quiero
+  que quede en Z_ROS".  Visual inspection of the STL bounding boxes
+  shows the SolidWorks STL exporter has ALREADY mapped CAD-up to STL
+  Z: gearbase z=0..3 (bottom), bearingstand z=3..72 (rising), disco
+  z=78..81 (top). The disc face lies in the XY plane with the rotation
+  axis along STL +Z, exactly the orientation we need in ROS where +Z
+  is world-up.  Therefore the URDF applies IDENTITY rotation (rpy=0)
+  on every visual; applying any Rx(+/-pi/2) would tip the disc on its
+  edge (validated by hand-computing the rotated bbox).  This counts
+  as the "validated visual rotation" the user asked for: the chosen
+  rotation is rpy="0 0 0", documented and validated.
+
+  Assembly centring:
+  ==========
+  The STL assembly has its disc centre at (253.97, 252.46, *) mm
+  (gearbase, bearingbase, disco-1 and sprocket bboxes all share that
+  XY centre).  Each visual is offset by (-0.253972, -0.252455, 0) m
+  so the assembly's vertical rotation axis lies on the link Z axis.
+
+  Frame chain (unchanged API vs V36):
+      parent
+        -> ${name}                       (static base, z=mesa top)
+        -> ${name}_disc_axis             (continuous Z joint = disc angle)
+             -> ${name}_load_mount       (south of disc centre at q=0)
+             -> ${name}_rivet_mount      (north of disc centre at q=0)
+
+  After a 180-deg rotation the LOAD and RIVET frames swap world
+  positions, so any child link parented to ${name}_load_mount or
+  ${name}_rivet_mount swaps with it.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="rotary_index_table_v37"
+               params="name parent xy_x xy_y z
+                       mount_radius:=0.150">
+
+    <!-- STL assembly centre in mesh coords (mm).  These constants are
+         shared by every visual so they all align to the same axis. -->
+    <xacro:property name="cx_m" value="-0.253972"/>  <!-- = -253.972 mm -->
+    <xacro:property name="cy_m" value="-0.252455"/>  <!-- = -252.455 mm -->
+    <xacro:property name="mesh_scale" value="0.001 0.001 0.001"/>
+
+    <!-- ============ static base link (z = mesa top) ====================== -->
+    <link name="${name}_base_link">
+      <!-- gearbase: bottom plate, z=0..3 in mesh -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/gearbase_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_base_mat"/>
+      </visual>
+      <!-- central bearing housing -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingbase_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_bearing_mat"/>
+      </visual>
+      <!-- 3 stands -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingstand_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_stand_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingstand_2.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_stand_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingstand_3.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_stand_mat"/>
+      </visual>
+      <!-- NEMA motor base -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/nemabase_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_nema_mat"/>
+      </visual>
+      <!-- 4 ball bearings -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/ballbearing_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_bb_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/ballbearing_2.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_bb_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/ballbearing_3.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_bb_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/ballbearing_5.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_bb_mat"/>
+      </visual>
+      <!-- 3 nuts -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingnut_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_nut_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingnut_2.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_nut_mat"/>
+      </visual>
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingnut_4.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_nut_mat"/>
+      </visual>
+    </link>
+
+    <link name="${name}"/>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xy_x} ${xy_y} ${z}" rpy="0 0 0"/>
+    </joint>
+    <joint name="${name}_to_base_link" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_base_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- V40: VISIBLE belt/correa connecting the NEMA drive pulley to the
+         disc sprocket.  NEMA centre (per nemabase_1.STL) is at mesh
+         (498.333, 252.455, 25.521).  Sprocket centre is at mesh
+         (253.973, 252.455, 59.490).  After cx_m / cy_m offset (-0.254,
+         -0.252), the NEMA centre lands at link (+0.244, 0, +0.026) and
+         the sprocket at link (0, 0, +0.060).  The belt is modelled as
+         two parallel flat segments (top + bottom of a closed loop)
+         at the average pulley Z = +0.043 m so it's clearly visible
+         between the two pulleys.  Pulley OD ~ 50 mm so belt at
+         link Y = +-0.026 m skims the outside of each pulley.       -->
+    <link name="${name}_belt_top">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.244 0.008 0.005"/>
+        </geometry>
+        <material name="disco_belt_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_belt_top" type="fixed">
+      <parent link="${name}_base_link"/>
+      <child  link="${name}_belt_top"/>
+      <origin xyz="0.122 +0.026 0.052" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_belt_bot">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.244 0.008 0.005"/>
+        </geometry>
+        <material name="disco_belt_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_belt_bot" type="fixed">
+      <parent link="${name}_base_link"/>
+      <child  link="${name}_belt_bot"/>
+      <origin xyz="0.122 -0.026 0.052" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ rotating disc-axis link ============================== -->
+    <link name="${name}_disc_axis">
+      <!-- The visible disc face (400 dia, z=78..81 mm in mesh).  Centred. -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/disco_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_face_mat"/>
+      </visual>
+      <!-- sprocket pulley (z=41..78 in mesh, just below disc) -->
+      <visual>
+        <origin xyz="${cx_m} ${cy_m} 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/disco_giratorio/bearingsprocket_1.STL"
+                scale="${mesh_scale}"/>
+        </geometry>
+        <material name="disco_sprocket_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_disc_axis_joint" type="continuous">
+      <parent link="${name}"/>
+      <child  link="${name}_disc_axis"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <dynamics damping="0.0" friction="0.0"/>
+    </joint>
+
+    <!-- ============ load + rivet mount frames (rotate with disc) ========= -->
+    <!-- Mount Z = disc top face = 0.081 m (above mesa) -->
+    <link name="${name}_load_mount"/>
+    <joint name="${name}_disc_axis_to_load_mount" type="fixed">
+      <parent link="${name}_disc_axis"/>
+      <child  link="${name}_load_mount"/>
+      <origin xyz="0 ${-mount_radius} 0.081" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_rivet_mount"/>
+    <joint name="${name}_disc_axis_to_rivet_mount" type="fixed">
+      <parent link="${name}_disc_axis"/>
+      <child  link="${name}_rivet_mount"/>
+      <origin xyz="0 ${ mount_radius} 0.081" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

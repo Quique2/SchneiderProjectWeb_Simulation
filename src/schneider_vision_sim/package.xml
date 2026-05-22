@@ -1,0 +1,11 @@
+﻿<?xml version="1.0"?>
+<package format="2">
+  <name>schneider_vision_sim</name>
+  <version>0.26.0</version>
+  <description>Vision sensor + camera trigger + PASS/FAIL TCP/IP sim (V20).</description>
+  <maintainer email="miguelaor681@outlook.com">Miguel Aor</maintainer>
+  <license>BSD</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+</package>

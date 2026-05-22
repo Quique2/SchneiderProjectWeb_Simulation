@@ -1,0 +1,48 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+  - Class: rviz/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.1
+      Color: 160; 160; 160
+      Line Style: { Line Width: 0.03, Value: Lines }
+      Plane: XY
+    - Class: rviz/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Robot Description: robot_description
+      Update Interval: 0
+      Visual Enabled: true
+      Collision Enabled: false
+      Alpha: 1.0
+    - Class: rviz/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+      Show Axes: true
+      Show Arrows: false
+      Marker Scale: 0.10
+  Global Options:
+    Background Color: 240; 240; 240
+    Fixed Frame: world
+  Tools:
+    - Class: rviz/Interact
+    - Class: rviz/MoveCamera
+    - Class: rviz/FocusCamera
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 1.8
+      Focal Point: { X: 0.0, Y: 0.0, Z: 0.30 }
+      Pitch: 0.30
+      Yaw:   0.785
+      Target Frame: world
+Window Geometry:
+  Width: 1280
+  Height: 768

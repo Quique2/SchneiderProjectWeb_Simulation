@@ -1,0 +1,175 @@
+================================================================================
+V46 cycle simulator -- 3 CAFIs end-to-end
+Spawn rpy: (0, pi, pi)  --  net Rx(pi)  (V45 used (0, 0, pi))
+LATERAL_GRASP_OFFSET: 0.082 m (V44 had 0.030 -> appendage atravesaba)
+Release height: +20 mm above cradle base
+================================================================================
+
+==== CAFI #1  (verdict will be PASS) ====
+  SPAWN  pos=(+1.6200, +1.3650, +1.0825) quat=(-1.0, 0.0, 0.0, 0.0) (rpy=(0,pi,pi); net Rx(pi))
+    spawn quat matches rpy(0,pi,pi) (|dot|=1.0000)
+  CONVEYOR delivered to PICK pos=(+1.2350, +1.3650, +1.0825) yaw=-0.000
+  TRAJ_PICK_CONV:
+    POSE_APPROACH_CONVEYOR         tcp=(+1.3169, +1.3650, +1.2066) min_jZ=1.0867
+    POSE_PICK_CONVEYOR             tcp=(+1.3169, +1.3650, +1.0866) min_jZ=1.0402
+    -> lateral grasp offset +0.0820 m (target +0.0820; err 0.0000)
+    -> TCP-vs-CAFI lateral projection: TCP=-0.0820, CAFI_half=0.0614, MARGIN=+0.0206 m  (OUTSIDE (no penetration))
+    [GRIP] CLOSE jaw -> appendage clamps lateral face
+    POSE_LIFT_CONVEYOR             tcp=(+1.3169, +1.3650, +1.2366) min_jZ=1.0867
+    [RIGID] CAFI follows gripper -> pos=(+1.2350, +1.3650, +1.2325) yaw=+0.000
+  TRAJ_PLACE_OUTER (V45: release at +20 mm; CAFI yaw kept from PICK):
+    POSE_APPROACH_LOAD_FIXTURE     tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_RELEASE_LOAD_FIXTURE      tcp=(+0.8188, +1.1090, +1.1476) min_jZ=1.0867
+    -> release@+20mm  TCP_Z=1.1476, expected=1.1435, OK
+    [GRIP] OPEN jaw -> CAFI falls 20 mm, settles in fixture
+    [SETTLE] CAFI on cradle: pos=(+0.7370, +1.1090, +1.1235) quat=(1.0, 0.0, 0.0, 0.0)
+    POSE_RETREAT_LOAD_FIXTURE      tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  [DISC] LOAD->RIVET index (CAFI follows seat rigidly)
+  [RIVET] press cycles
+  TRAJ_PICK_RIVETED:
+    POSE_APPROACH_PICK_RIVETED     tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_PICK_RIVETED              tcp=(+0.8189, +1.1090, +1.1276) min_jZ=1.0867
+    -> lateral offset +0.0820 m (target +0.0820; err 0.0000)
+    [GRIP] CLOSE jaw -> lateral clamp on riveted CAFI
+    POSE_LIFT_RIVETED              tcp=(+0.8128, +1.1149, +1.2428) min_jZ=1.0867
+  TRAJ_PLACE_VISION (V45: release at +20 mm; orientation kept):
+    POSE_APPROACH_VISION           tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_RELEASE_VISION            tcp=(+0.8319, +0.8040, +1.0516) min_jZ=1.0867
+    -> release@+20mm  TCP_Z=1.0516, expected=1.0475, OK
+    [GRIP] OPEN jaw -> CAFI falls 20 mm onto vision cradle
+    [SETTLE] CAFI on vision cradle: pos=(+0.7500, +0.8040, +1.0275) quat=(-1.0, -0.0, -0.0, 0.0)
+    POSE_RETREAT_VISION            tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  [VISION] camera inspect; verdict=PASS
+  TRAJ_PICK_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_PLACE_VISION              tcp=(+0.8318, +0.8040, +1.0316) min_jZ=1.0867
+    [GRIP] CLOSE jaw -> lateral grasp on vision CAFI
+    POSE_RETREAT_VISION            tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+  TRAJ_PLACE_ACCEPT:
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.7319, +0.7200, +1.1416) min_jZ=1.0867
+    POSE_DROP_ACCEPT_BIN           tcp=(+1.7319, +0.7200, +1.0216) min_jZ=1.0867
+    [GRIP] OPEN jaw -> CAFI dropped into bin
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.7319, +0.7200, +1.1416) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  CAFI #1 cycle complete  (overall: OK)
+
+==== CAFI #2  (verdict will be PASS) ====
+  SPAWN  pos=(+1.6200, +1.3650, +1.0825) quat=(-1.0, 0.0, 0.0, 0.0) (rpy=(0,pi,pi); net Rx(pi))
+    spawn quat matches rpy(0,pi,pi) (|dot|=1.0000)
+  CONVEYOR delivered to PICK pos=(+1.2350, +1.3650, +1.0825) yaw=-0.000
+  TRAJ_PICK_CONV:
+    POSE_APPROACH_CONVEYOR         tcp=(+1.3169, +1.3650, +1.2066) min_jZ=1.0867
+    POSE_PICK_CONVEYOR             tcp=(+1.3169, +1.3650, +1.0866) min_jZ=1.0402
+    -> lateral grasp offset +0.0820 m (target +0.0820; err 0.0000)
+    -> TCP-vs-CAFI lateral projection: TCP=-0.0820, CAFI_half=0.0614, MARGIN=+0.0206 m  (OUTSIDE (no penetration))
+    [GRIP] CLOSE jaw -> appendage clamps lateral face
+    POSE_LIFT_CONVEYOR             tcp=(+1.3169, +1.3650, +1.2366) min_jZ=1.0867
+    [RIGID] CAFI follows gripper -> pos=(+1.2350, +1.3650, +1.2325) yaw=+0.000
+  TRAJ_PLACE_OUTER (V45: release at +20 mm; CAFI yaw kept from PICK):
+    POSE_APPROACH_LOAD_FIXTURE     tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_RELEASE_LOAD_FIXTURE      tcp=(+0.8188, +1.1090, +1.1476) min_jZ=1.0867
+    -> release@+20mm  TCP_Z=1.1476, expected=1.1435, OK
+    [GRIP] OPEN jaw -> CAFI falls 20 mm, settles in fixture
+    [SETTLE] CAFI on cradle: pos=(+0.7370, +1.1090, +1.1235) quat=(1.0, 0.0, 0.0, 0.0)
+    POSE_RETREAT_LOAD_FIXTURE      tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  [DISC] LOAD->RIVET index (CAFI follows seat rigidly)
+  [RIVET] press cycles
+  TRAJ_PICK_RIVETED:
+    POSE_APPROACH_PICK_RIVETED     tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_PICK_RIVETED              tcp=(+0.8189, +1.1090, +1.1276) min_jZ=1.0867
+    -> lateral offset +0.0820 m (target +0.0820; err 0.0000)
+    [GRIP] CLOSE jaw -> lateral clamp on riveted CAFI
+    POSE_LIFT_RIVETED              tcp=(+0.8128, +1.1149, +1.2428) min_jZ=1.0867
+  TRAJ_PLACE_VISION (V45: release at +20 mm; orientation kept):
+    POSE_APPROACH_VISION           tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_RELEASE_VISION            tcp=(+0.8319, +0.8040, +1.0516) min_jZ=1.0867
+    -> release@+20mm  TCP_Z=1.0516, expected=1.0475, OK
+    [GRIP] OPEN jaw -> CAFI falls 20 mm onto vision cradle
+    [SETTLE] CAFI on vision cradle: pos=(+0.7500, +0.8040, +1.0275) quat=(-1.0, -0.0, -0.0, 0.0)
+    POSE_RETREAT_VISION            tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  [VISION] camera inspect; verdict=PASS
+  TRAJ_PICK_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_PLACE_VISION              tcp=(+0.8318, +0.8040, +1.0316) min_jZ=1.0867
+    [GRIP] CLOSE jaw -> lateral grasp on vision CAFI
+    POSE_RETREAT_VISION            tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+  TRAJ_PLACE_ACCEPT:
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.7319, +0.7200, +1.1416) min_jZ=1.0867
+    POSE_DROP_ACCEPT_BIN           tcp=(+1.7319, +0.7200, +1.0216) min_jZ=1.0867
+    [GRIP] OPEN jaw -> CAFI dropped into bin
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.7319, +0.7200, +1.1416) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  CAFI #2 cycle complete  (overall: OK)
+
+==== CAFI #3  (verdict will be FAIL) ====
+  SPAWN  pos=(+1.6200, +1.3650, +1.0825) quat=(-1.0, 0.0, 0.0, 0.0) (rpy=(0,pi,pi); net Rx(pi))
+    spawn quat matches rpy(0,pi,pi) (|dot|=1.0000)
+  CONVEYOR delivered to PICK pos=(+1.2350, +1.3650, +1.0825) yaw=-0.000
+  TRAJ_PICK_CONV:
+    POSE_APPROACH_CONVEYOR         tcp=(+1.3169, +1.3650, +1.2066) min_jZ=1.0867
+    POSE_PICK_CONVEYOR             tcp=(+1.3169, +1.3650, +1.0866) min_jZ=1.0402
+    -> lateral grasp offset +0.0820 m (target +0.0820; err 0.0000)
+    -> TCP-vs-CAFI lateral projection: TCP=-0.0820, CAFI_half=0.0614, MARGIN=+0.0206 m  (OUTSIDE (no penetration))
+    [GRIP] CLOSE jaw -> appendage clamps lateral face
+    POSE_LIFT_CONVEYOR             tcp=(+1.3169, +1.3650, +1.2366) min_jZ=1.0867
+    [RIGID] CAFI follows gripper -> pos=(+1.2350, +1.3650, +1.2325) yaw=+0.000
+  TRAJ_PLACE_OUTER (V45: release at +20 mm; CAFI yaw kept from PICK):
+    POSE_APPROACH_LOAD_FIXTURE     tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_RELEASE_LOAD_FIXTURE      tcp=(+0.8188, +1.1090, +1.1476) min_jZ=1.0867
+    -> release@+20mm  TCP_Z=1.1476, expected=1.1435, OK
+    [GRIP] OPEN jaw -> CAFI falls 20 mm, settles in fixture
+    [SETTLE] CAFI on cradle: pos=(+0.7370, +1.1090, +1.1235) quat=(1.0, 0.0, 0.0, 0.0)
+    POSE_RETREAT_LOAD_FIXTURE      tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  [DISC] LOAD->RIVET index (CAFI follows seat rigidly)
+  [RIVET] press cycles
+  TRAJ_PICK_RIVETED:
+    POSE_APPROACH_PICK_RIVETED     tcp=(+0.8189, +1.1090, +1.2474) min_jZ=1.0867
+    POSE_PICK_RIVETED              tcp=(+0.8189, +1.1090, +1.1276) min_jZ=1.0867
+    -> lateral offset +0.0820 m (target +0.0820; err 0.0000)
+    [GRIP] CLOSE jaw -> lateral clamp on riveted CAFI
+    POSE_LIFT_RIVETED              tcp=(+0.8128, +1.1149, +1.2428) min_jZ=1.0867
+  TRAJ_PLACE_VISION (V45: release at +20 mm; orientation kept):
+    POSE_APPROACH_VISION           tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_RELEASE_VISION            tcp=(+0.8319, +0.8040, +1.0516) min_jZ=1.0867
+    -> release@+20mm  TCP_Z=1.0516, expected=1.0475, OK
+    [GRIP] OPEN jaw -> CAFI falls 20 mm onto vision cradle
+    [SETTLE] CAFI on vision cradle: pos=(+0.7500, +0.8040, +1.0275) quat=(-1.0, -0.0, -0.0, 0.0)
+    POSE_RETREAT_VISION            tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  [VISION] camera inspect; verdict=FAIL
+  TRAJ_PICK_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+    POSE_PLACE_VISION              tcp=(+0.8318, +0.8040, +1.0316) min_jZ=1.0867
+    [GRIP] CLOSE jaw -> lateral grasp on vision CAFI
+    POSE_RETREAT_VISION            tcp=(+0.8318, +0.8040, +1.1516) min_jZ=1.0867
+  TRAJ_PLACE_REJECT:
+    POSE_APPROACH_REJECT_BIN       tcp=(+1.4119, +0.7200, +1.1416) min_jZ=1.0867
+    POSE_DROP_REJECT_BIN           tcp=(+1.4119, +0.7200, +1.0216) min_jZ=1.0867
+    [GRIP] OPEN jaw -> CAFI dropped into bin
+    POSE_APPROACH_REJECT_BIN       tcp=(+1.4119, +0.7200, +1.1416) min_jZ=1.0867
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) min_jZ=1.0867
+  CAFI #3 cycle complete  (overall: OK)
+
+================================================================================
+Min tcp_grasp_center Z across ALL poses: 1.0216 m
+Min joint origin Z (non-base) ALL poses: 1.0402 m
+Joint clearance above mesa:              +0.0402 m
+================================================================================
+
+Overall: 3/3 CAFIs cycled
+Watchdogs tripped:        0
+FAULT events:             0
+Floor contacts:           0
+Joints below mesa:        0
+Plant collisions:         0  (see pose_collision_check_V45.txt)
+Magic reorientation:      0  (rigid-body follow vía t_seat_cafi)
+Jaw atraviesa CAFI:       0  (lateral_offset 0.082 m, TCP outside CAFI)
+CAFI spawn quat:          rpy(0, pi, pi)  --  net Rx(pi) verified
+CAFI orientation preserved through cycle: yes  (|dot| >= 0.99 against
+                                                 V46 spawn quat at every
+                                                 PICK / RELEASE / SETTLE)

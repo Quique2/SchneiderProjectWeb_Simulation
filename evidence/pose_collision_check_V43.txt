@@ -1,0 +1,26 @@
+
+V43 collision check (new cobot URDF + final gripper)
+Pose                            Status  Collision report
+----------------------------------------------------------------------------------------------------
+POSE_HOME                       PASS  
+POSE_APPROACH_CONVEYOR          PASS  
+POSE_PICK_CONVEYOR              PASS  
+POSE_LIFT_CONVEYOR              PASS  
+POSE_APPROACH_LOAD_FIXTURE      PASS  
+POSE_PLACE_LOAD_FIXTURE         PASS  
+POSE_RELEASE_LOAD_FIXTURE       PASS  
+POSE_RETREAT_LOAD_FIXTURE       PASS  
+POSE_APPROACH_PICK_RIVETED      PASS  
+POSE_PICK_RIVETED               PASS  
+POSE_LIFT_RIVETED               PASS  
+POSE_APPROACH_VISION            PASS  
+POSE_PLACE_VISION               PASS  
+POSE_RELEASE_VISION             PASS  
+POSE_RETREAT_VISION             PASS  
+POSE_APPROACH_ACCEPT_BIN        PASS  
+POSE_DROP_ACCEPT_BIN            PASS  
+POSE_APPROACH_REJECT_BIN        PASS  
+POSE_DROP_REJECT_BIN            PASS  
+
+Lowest gripper/tcp Z across all poses: 0.9794 m (floor at z=0)
+Overall: PASS

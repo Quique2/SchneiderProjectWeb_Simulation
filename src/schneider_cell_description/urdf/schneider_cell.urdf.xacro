@@ -1,0 +1,779 @@
+<?xml version="1.0"?>
+<!--
+  schneider_cell.urdf.xacro  -  V44 (release 2 cm, lateral grasp, no
+                                      magic orientation, smaller rivet cabin,
+                                      bins right, vision left)
+  ===========================================================================
+  V44 SUMMARY (deltas vs V43):
+   * Release height SHRUNK from +100 mm to +20 mm above the cradle
+     base (POSE_RELEASE_LOAD_FIXTURE, POSE_RELEASE_VISION).  CAFI now
+     falls only 20 mm under gravity to settle into the seat.
+   * Lateral grasp: IK targets shifted by 0.030 m along the gripper's
+     LOCAL +Y closing direction at PICK/PLACE so the moving appendage
+     jaw clamps the CAFI from one lateral side (not from the centre
+     between the jaws).  Implementation: two-pass IK in resolve_poses.py.
+   * Object manager settling: XY snap clamp tightened from 100 mm to
+     5 mm.  Seat orientation override REMOVED so the CAFI keeps the
+     orientation it had at release (no magic rotation).
+   * Rivet cabin SHRUNK: cabin_size 0.700x0.400 -> 0.450x0.300,
+     cabin_height 0.500 -> 0.350.  South edge of canopy now 0.200 m
+     north of the LOAD seat (vs 0.000 m before), so the cobot wrist
+     no longer collides with the canopy at any LOAD-related pose.
+   * Bins moved EAST: aceptado (1.580, 0.679) -> (1.650, 0.720);
+     rechazado (1.320, 0.684) -> (1.330, 0.720).  Separation widened
+     from 260 mm to 320 mm (93 mm clear between walls).  Both still
+     inside the L03S reach with 29 mm / 252 mm of margin.
+   * Vision fixture + camera + sensor shifted 74 mm WEST: from x=0.824
+     to x=0.750.  Reach margin 155 mm; no impact on existing vision
+     pose quality.
+   * Per-joint mesa clearance check added to pose_collision_checker
+     V44: every joint origin world Z must be > 1.000 + 5 mm at every
+     pose.
+   * 19 poses re-resolved with lateral grasp + tighter release +
+     new layout (resolve_poses.py).
+  ===========================================================================
+  V43 SUMMARY (deltas vs V42):
+   * The cobot is now the user-supplied URDF
+     /home/student/planta Schneider/lexium_cobot_with_final_gripper_z_reference.zip
+     mounted unchanged in kinematics, joint origins, axes, rpy and joint
+     limits.  joint_2 rpy="0 0 0.05" comes back (V36-A's zero-out is
+     reverted because the user URDF ships that 2.86 deg CAD skew).
+   * Gripper is now PART OF the cobot URDF (5 STLs + prismatic
+     appendage_prismatic_joint + tcp_link at the working centre).  The
+     old new_gripper.xacro is NO LONGER included or instantiated.
+   * Logical TCP frame the planta uses: lexium_cobot_tcp_grasp_center
+     (alias for tcp_link inside the cobot xacro), addressed by FK, IK,
+     object manager, gripper sim, collision filter, pick/place
+     trajectories.
+   * RELEASE_LOAD_FIXTURE and RELEASE_VISION pose entries added so the
+     gripper releases the CAFI 100 mm ABOVE the cradle base (user spec).
+   * NEMA + belt already on the RIGHT of the disc (link X=+0.244,
+     world (0.936, 1.259)) — V41/V42 layout preserved.
+   * All 19 IK-resolved poses re-validated against the new TCP offset
+     (resolve_poses.py + validate_robot_poses.txt: 19/19 PASS;
+     pose_collision_checker.py: 19/19 PASS).
+  ===========================================================================
+  V38 SUMMARY (only the deltas vs V37):
+   * Cobot mounted DIRECTLY on the mesa, NO external pedestal: the
+     canonical link0_base.STL is the real cobot base; it sits at
+     world (1.252, 1.049, 1.000), centre of the mesa.
+     mount_mode="floor" (Rx +pi/2) keeps the arm standing.  No more
+     cabin overhead mount, no more pedestal cylinder.
+   * Conveyor PICK switched to the LEFT (west) end of the belt.
+     Notch on the south rail moved from local X=+0.150 to X=-0.135 so
+     the cobot grabs at world (1.235, 1.365).  Suministro CAFI feeder
+     moved to the EAST end of the belt; CAFIs travel east-to-west.
+     sensor_conveyor_end re-aimed at the west pick.
+   * Camera HANGING from cabin top profile (z=2.07) by a vertical
+     column down to the body at z=1.32 (= mesa + 0.32 per spec).
+     arm_length=0 -> column coaxial with body, looking straight down
+     at the fixture cámara on the mesa.
+   * Riveting cabin WIDER (0.700 x 0.400 vs V37's 0.400 x 0.300) so
+     the 530 x 500 mm disco gearbase fits with margin and the LOAD
+     side is open to the cobot.
+   * V37 residue removed: cobot_reach_circle (yaml), publish_cell_
+     markers.py (script + 14 old station labels), V19-V18 history
+     block in scene_dimensions.yaml, V34/V33 view rviz files, old
+     cycle_simulate_v36/v37.py, old evidence logs.
+   * Everything else (mesa real 1.62 x 0.92 x 1.00, disco giratorio
+     STL pack, gripper alignment, control station XY) is preserved
+     from V37 byte-for-byte where it was correct.
+  ===========================================================================
+  V38 SUMMARY (only the deltas vs V37):
+   * Cobot mounted DIRECTLY on the mesa, NO external pedestal: the
+     canonical link0_base.STL is the real cobot base; it sits at
+     world (1.252, 1.049, 1.000), centre of the mesa.
+     mount_mode="floor" (Rx +pi/2) keeps the arm standing.  No more
+     cabin overhead mount, no more pedestal cylinder.
+   * Conveyor PICK switched to the LEFT (west) end of the belt.
+     Notch on the south rail moved from local X=+0.150 to X=-0.135 so
+     the cobot grabs at world (1.235, 1.365).  Suministro CAFI feeder
+     moved to the EAST end of the belt; CAFIs travel east-to-west.
+     sensor_conveyor_end re-aimed at the west pick.
+   * Camera HANGING from cabin top profile (z=2.07) by a vertical
+     column down to the body at z=1.32 (= mesa + 0.32 per spec).
+     arm_length=0 -> column coaxial with body, looking straight down
+     at the fixture cámara on the mesa.
+   * Riveting cabin WIDER (0.700 x 0.400 vs V37's 0.400 x 0.300) so
+     the 530 x 500 mm disco gearbase fits with margin and the LOAD
+     side is open to the cobot.
+   * V37 residue removed: cobot_reach_circle (yaml), publish_cell_
+     markers.py (script + 14 old station labels), V19-V18 history
+     block in scene_dimensions.yaml, V34/V33 view rviz files, old
+     cycle_simulate_v36/v37.py, old evidence logs.
+   * Everything else (mesa real 1.62 x 0.92 x 1.00, disco giratorio
+     STL pack, gripper alignment, control station XY) is preserved
+     from V37 byte-for-byte where it was correct.
+  ===========================================================================
+  V37 SUMMARY (kept for diff context):
+   * Layout XY re-imported from PlantaSchneiderReal.dxf (1 mm = 0.001 m).
+     DXF mesa outline (1620 x 920 mm) is anchored in world so its
+     centre still sits at (1.252, 1.049) - V36 frame preserved.
+   * Cobot NO LONGER hangs.  Floor-mounted on a 0.55 m pedestal column
+     (radius 0.060 m) at world (0.950, 0.972).  mount_mode="floor"
+     applies Rx(+pi/2) so the canonical CAD +Y arm-axis maps to
+     world +Z (cobot stands up).  yaw=0 leaves the arm reaching
+     toward world +X.
+   * Process platform REMOVED.  Cobot reaches mesa-top items directly
+     from the pedestal (mesa top z=1.000; cobot tool0 q=0 at z=1.018).
+   * Disco giratorio REBUILT with 15 STLs from disco giratorio.zip.
+     STL inspection confirmed Z is already the vertical axis in the
+     exported meshes - the URDF applies IDENTITY rotation per visual.
+     Disc centre placed at DXF (250.1, 670) mm -> world (0.692, 1.259).
+     Disco_1 face top at z=1.081 (mesa top + 0.081).
+   * Conveyor at DXF (927.5, 775.7) mm -> world (1.370, 1.365), size
+     0.375 x 0.150, belt top z=1.070.
+   * Aceptado/Rechazado bins at world (1.411, 0.679) and (1.110, 0.684)
+     per DXF #38 and #37, bin floor on mesa top (z=1.000).
+   * Fixture cámara at world (0.824, 0.804) per DXF #46.  Cognex camera
+     body directly above at z=1.320 (= mesa top + 0.320 per spec).
+   * Estación de control at world (0.684, 0.462), OUTSIDE the mesa
+     to the south (DXF #39).
+   * Gripper alignment UNCHANGED: tool0 -> gripper_mount transform
+     preserved (mount_xyz "0 -0.014 0", mount_rpy "-pi/2 0 0",
+     mount_yaw=pi).  SolidWorks 99.5 mm reference still maps to
+     link -Y; jaw tip lands at world height tool0_z - 0.083 m.
+   * Aluminum cabin kept as a decorative enclosure (cobot does NOT
+     hang from it any more).  Cabin posts span world floor to z=2.07.
+  ===========================================================================
+  V36 (PREVIOUS) doc retained below for historical context:
+  ======================================================================
+  schneider_cell.urdf.xacro  -  V36 (real-planta dimensions, hanging
+                                      cobot at top profile, process
+                                      platform elevated on mesa)
+  ===========================================================================
+  V36 CHANGES vs V35:
+    * MESA = real Schneider planta dimensions: 1.62 m x 0.92 m,
+        top surface z = 1.00 m.  Centred at world (1.600, 0.700)
+        directly under the cobot anchor.
+    * ALUMINUM CABIN rebuilt with REAL 50 x 50 mm aluminum profiles
+        (V35 used 45 mm).  Structure top at world z = 2.07 m; top
+        profile bottom face = 2.02 m (where cobot mounting flange
+        bolts on).
+    * PROCESS PLATFORM 2.00 x 1.50 m steel plate at top_z = 1.20 m,
+        sits 0.20 m above mesa.  Mesa supports the central 1.62 x
+        0.92 m overlap; 4 corner posts carry the overhanging area.
+        All V35 process station XY/Z preserved (BELT_TOP=1.277,
+        LOAD_SEAT=1.312, VISION_TOP=1.250, BIN_FLOOR=1.205).
+        Platform height chosen by FK/IK: with cobot anchor at
+        z=2.02 m the IK reaches every target with |q|<2 rad and
+        0.1 mm Cartesian error.
+    * COBOT anchor: world z 2.350 -> 2.020 (real top profile underside).
+        Anchor XY (1.600, 0.700) preserved.  Rx(-pi/2): CAD +Y -> -Z.
+    * HOME redefined: J1=0, J2=0, J3=0, J4=-pi/2, J5=-pi/2, J6=0
+        (real planta HOME).  V35 used q=0 — now obsolete.
+    * GRIPPER mount realigned per SolidWorks 99.5 mm Z reference:
+        mount_xyz="0 -0.014 0", mount_yaw=pi.  Stump bottom-face
+        centre now coincident with tool0 origin (flange face).
+    * CANONICAL URDF correction V36-A: joint_2 rpy "0 0 0.05" -> "0 0 0"
+        (was a 2.86 deg CAD measurement skew producing the small
+        visible wobble in V32..V35).
+  ===========================================================================
+  V23 (historic) doc: CAD-faithful fixture, IK-validated cobot poses,
+                      grasp_center at the tip.
+  ===========================================================================
+  V23 CHANGES (vs V22 untouched layout):
+    * fixture_rivet.xacro rebuilt from the user's SolidWorks assembly
+      meshes.  Each fixture now has EXACTLY 2 lateral solenoids (real
+      EnsamblajePISTONGOOD mesh + mirrored instance), the top SOLENOID
+      mesh is no longer instantiated in the fixture (it belongs to the
+      riveting station above), and the rivet hammer joint is kept with
+      no visual link so the rotary_fixture_sim controller does not see
+      an unknown joint.
+    * new_gripper.xacro: grasp_center moved from link Z=-0.075 to
+      link Z=+0.085 so the frame lands at the gripper tip (link +Z is
+      world -Z under the default tool0 orientation).  This is the single
+      change that lets the V23 geometric grasp work again; V20-V22
+      had the frame on the wrong side, which is why the V22 task-aware
+      grasp shortcut was invented as a workaround.
+    * No mesh moved, no link moved, no joint name changed in any other
+      component (lexium_cobot_real, plant_table, conveyor, vision,
+      cognex_2800, control_station, sensors, drives, pneumatics).
+  ===========================================================================
+  Original V20 doc below.
+
+  schneider_cell.urdf.xacro  -  V20  (REAL fixture on disc, prismatic jaw,
+                                      bigger disc, NO disc_anvil substitute,
+                                      NO stand-alone press)
+  ===========================================================================
+  V20 architectural changes (vs V19) at the URDF level:
+
+    [A] DISC REDESIGN
+        - disc_radius   0.180 -> 0.310   (620 mm diameter)
+        - mount_radius  0.150 -> 0.230   (460 mm centre-to-centre, fits
+                                          the REAL 297 mm fixture)
+        - LOAD mount (outer, cobot side): world (1.671, 1.145, 1.220)
+        - RIVET mount (inner, press side): world (1.671, 1.605, 1.220)
+        - Cobot-to-LOAD distance = 0.225 m (well inside 0.626 m reach)
+
+    [B] REAL FIXTURE ON THE DISC
+        - V19 disc_anvil.xacro is GONE (file removed).
+        - Two copies of the REAL `fixture_rivet` (user's rivet_final
+          assembly) instanced on the disc.  The two LATERAL solenoids
+          + the TOP piston are now per-fixture moving joints.
+        - V19 stand-alone rivet_press_stand + rivet_press_assembly are
+          REMOVED.  The rivet press IS the on-disc fixture.
+        - Cabin geometry preserved (include_press=false stays).
+
+    [C] PRISMATIC JAW IN GRIPPER
+        - new_gripper.xacro now has a 5th visual link (`gripper_base_jaw`)
+          connected with `gripper_base_jaw_joint` (prismatic, axis +X,
+          range [-0.016, 0.000]).
+        - The fictitious Marker.CUBE jaws of V19 are GONE (process
+          markers no longer render proxy jaws).
+
+    [D] PISTON RPY CORRECTED
+        - gripper_pneumatics sub-anchor rpy V19 (0, +pi/2, 0) -> V20
+          (0, -pi/2, 0).  Same axis (Ry), opposite sign.  Cluster stays
+          inside the housing without protrusion.
+
+  Cobot kinematics: byte-for-byte V15..V19 (lexium_cobot_real unchanged).
+  V20 publishes joints J1..J6 PLUS the disc joint, jaw joint, fixture
+  piston/solenoids joints via the schneider_robot_controller +
+  schneider_gripper_sim + schneider_rotary_fixture_sim nodes.
+-->
+<robot name="schneider_cell" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="scene_yaml" default=""/>
+
+  <!-- ===== component libraries (V20: no disc_anvil) ================== -->
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/materials.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/plant_table.xacro"/>
+  <!-- V38: process_platform.xacro removed (process platform deleted in V37). -->
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/workstation.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/conveyor.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/fixture_rivet.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/fixture_vision.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/cafi.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/cognex_2800.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/lexium_cobot_real.xacro"/>
+  <!-- V30: aluminum cabin frame that supports the hanging cobot. -->
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/aluminum_cabin.xacro"/>
+  <!-- V43: gripper is now PART OF the cobot URDF
+       (lexium_cobot_with_final_gripper.xacro).  The old new_gripper.xacro
+       is no longer included or instantiated. -->
+  <!-- <xacro:include filename="$(find schneider_cell_description)/urdf/components/new_gripper.xacro"/> -->
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/riveting_station.xacro"/>
+  <!-- V37: rotary_index_table replaced with the STL-based V37 rebuild. -->
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/rotary_index_table_v37.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/control_station.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/photoelectric_sensor_sick_grte18s_p2312.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/conveyor_motor.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/rotary_drive_nema17_planetary.xacro"/>
+  <xacro:include filename="$(find schneider_cell_description)/urdf/components/pneumatic_supply.xacro"/>
+  <!-- V22: gripper_pneumatics removed from the assembly. The file stays
+       on disk for history but is NOT included. See "[Fix 3]" in
+       schneider_cell_description_V22_resumen.md. -->
+  <!-- <xacro:include filename="$(find schneider_cell_description)/urdf/components/gripper_pneumatics.xacro"/> -->
+
+
+  <!-- ===== world root ================================================ -->
+  <link name="world"/>
+
+  <link name="cell_floor">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="2.504408 2.098121 0.005"/></geometry>
+      <material name="floor_mat"/>
+    </visual>
+  </link>
+  <joint name="world_to_cell_floor" type="fixed">
+    <parent link="world"/>
+    <child  link="cell_floor"/>
+    <origin xyz="1.252205 1.049061 -0.0025" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ===== V36 Plant mesa (REAL Schneider planta dimensions) =========
+       Long side 1.62 m (X), short side 0.92 m (Y), top surface z=1.00 m.
+       Centred at the cobot anchor (1.252, 1.049) so the work envelope
+       is concentric with the mesa.
+       40 mm slab + 60 mm box-section legs from floor (z=0) up to the
+       slab underside.                                              -->
+  <xacro:plant_table name="plant_table" parent="world"
+                     xy_x="1.252205" xy_y="1.049061"
+                     size_x="1.620"  size_y="0.920"
+                     top_z="1.000"   thickness="0.040"
+                     leg_section="0.060"  leg_inset="0.060"
+                     stretcher_section="0.040"/>
+
+  <!-- V37: process platform REMOVED.  Floor-mounted cobot reaches
+       directly to mesa-top items (mesa_top z=1.000, cobot tool0 q=0
+       z=1.018) so the V36 0.30 m elevated platform is no longer
+       needed.  Bins and stations now rest directly on mesa top.   -->
+
+  <!-- ===== V38 Conveyor (DXF #47: 375 x 150 mm @ DXF 927.5, 775.7) ====
+       World (1.370, 1.365), top-of-belt at z = mesa_top + 0.070 = 1.070.
+       V38 picks on the LEFT side of the belt - notch at local X = -0.135
+       on the south rail, so the rail opening is at world X = 1.235
+       and the cobot grabs from the west (left) end.  Reach to that
+       point from the cobot at (1.252, 1.049) is just 0.353 m.        -->
+  <xacro:conveyor_section name="conveyor_1" parent="world"
+                          xy_x="1.370" xy_y="1.365"
+                          size_x="0.375"  size_y="0.150"
+                          top_z="1.070"  body_height="0.065"
+                          long_axis="x"
+                          support_z="1.000"
+                          notch_n_x_local="-0.135"
+                          notch_n_w="0.060"/>
+
+  <!-- ===== V38 Suministro CAFI (feeder at EAST end of belt; CAFIs are
+       fed in from the east and travel west to the left-side pick).  -->
+  <link name="suministro_cafi">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.150 0.220 0.015"/></geometry>
+      <material name="feeder_top"/>
+    </visual>
+  </link>
+  <joint name="world_to_suministro_cafi" type="fixed">
+    <parent link="world"/>
+    <child  link="suministro_cafi"/>
+    <origin xyz="1.620 1.365 1.0075" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ===== Quality bins (preserved) ================================== -->
+  <xacro:macro name="hollow_bin"
+               params="name parent xy_x xy_y size_x size_y height
+                       wall_t bottom_z material">
+    <link name="${name}_bottom">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${size_x} ${size_y} ${wall_t}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_bottom" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_bottom"/>
+      <origin xyz="${xy_x} ${xy_y} ${bottom_z + wall_t/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_wall_n">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${size_x} ${wall_t} ${height - wall_t}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+    <joint name="${name}_bottom_to_wall_n" type="fixed">
+      <parent link="${name}_bottom"/>
+      <child  link="${name}_wall_n"/>
+      <origin xyz="0 ${ size_y/2 - wall_t/2} ${wall_t/2 + (height - wall_t)/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_wall_s">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${size_x} ${wall_t} ${height - wall_t}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+    <joint name="${name}_bottom_to_wall_s" type="fixed">
+      <parent link="${name}_bottom"/>
+      <child  link="${name}_wall_s"/>
+      <origin xyz="0 ${-size_y/2 + wall_t/2} ${wall_t/2 + (height - wall_t)/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_wall_e">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${wall_t} ${size_y - 2*wall_t} ${height - wall_t}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+    <joint name="${name}_bottom_to_wall_e" type="fixed">
+      <parent link="${name}_bottom"/>
+      <child  link="${name}_wall_e"/>
+      <origin xyz="${ size_x/2 - wall_t/2} 0 ${wall_t/2 + (height - wall_t)/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_wall_w">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${wall_t} ${size_y - 2*wall_t} ${height - wall_t}"/></geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+    <joint name="${name}_bottom_to_wall_w" type="fixed">
+      <parent link="${name}_bottom"/>
+      <child  link="${name}_wall_w"/>
+      <origin xyz="${-size_x/2 + wall_t/2} 0 ${wall_t/2 + (height - wall_t)/2}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- V49 bins: rechazado pulled BACK INSIDE the mesa.  V48 placed it
+       at (1.330, 0.580) but mesa Y range is [0.589, 1.509]; bin half-Y
+       = 0.091 m so V48 spilled to Y_min=0.489 OFF the mesa.  V49
+       puts rechazado at (1.330, 0.700) — 120 mm north of V48 — so the
+       bin footprint Y[0.609, 0.791] sits ENTIRELY on the mesa with
+       20 mm of margin to the south edge.  aceptado kept at (1.650,
+       0.720) (V46 position; moving it south would push it past the
+       L03S 0.626 m reach sphere).
+       Reach 3D from cobot (1.152, 1.049, 1.000) to bin floor
+       (z=1.005) + CAFI half-height (z=1.018):
+         aceptado d = sqrt(0.498^2 + 0.329^2 + 0.018^2) = 0.597 m
+         rechazado d = sqrt(0.178^2 + 0.349^2 + 0.018^2) = 0.392 m
+       Both well inside the L03S 0.626 m reach.  Reject has 234 mm of
+       headroom; accept has 29 mm.  Top-down access stays clean: the
+       reject bin opening is centred at world (1.330, 0.700), 349 mm
+       south of the cobot base, no overlap with conveyor or cabin.  -->
+  <xacro:hollow_bin name="aceptado" parent="world"
+                    xy_x="1.650" xy_y="0.720"
+                    size_x="0.226837" size_y="0.172000"
+                    height="0.150" wall_t="0.005"
+                    bottom_z="1.000" material="bin_accept"/>
+  <xacro:hollow_bin name="rechazado" parent="world"
+                    xy_x="1.330" xy_y="0.700"
+                    size_x="0.226837" size_y="0.182000"
+                    height="0.150" wall_t="0.005"
+                    bottom_z="1.000" material="bin_reject"/>
+
+  <!-- ===== V37 Riveting zone anchor (disc CENTRE on mesa top) =========
+       Anchored at world (0.692, 1.259, 1.000) per DXF disco position.
+       The disc itself is mounted on this anchor; the cabin overhead
+       sits NORTH of the disc to clear the cobot working area.        -->
+  <link name="riveting_zone"/>
+  <joint name="world_to_riveting_zone" type="fixed">
+    <parent link="world"/>
+    <child  link="riveting_zone"/>
+    <origin xyz="0.692 1.259 1.000" rpy="0 0 0"/>
+  </joint>
+
+  <!-- V44 cabin: SHRUNK to give the cobot clean entry from the south.
+       V43 had cabin_size 0.700x0.400 with canopy at z=1.500.  V44
+       reduces footprint to 0.450x0.300 and height to 0.350 (canopy at
+       world z=1.350).  Canopy footprint extends NORTH of the disc only
+       (press_offset_y still 0.200 m), so the cobot approach corridor
+       to LOAD (from the south) is now completely open.
+         old cabin Y span at LOAD (y=1.109): 1.259 + 0.200 +/- 0.200 = [1.259, 1.659]
+         new cabin Y span at LOAD (y=1.109): 1.259 + 0.200 +/- 0.150 = [1.309, 1.609]
+       The new south edge of the canopy is at y=1.309 — 200 mm NORTH
+       of the LOAD seat (y=1.109).  The cobot wrist no longer collides
+       with the canopy during APPROACH_LOAD / RELEASE_LOAD / PICK_RIVETED.
+       Canopy top at z=1.350 clears CAFI top (z=1.136) by 214 mm.    -->
+  <xacro:riveting_station_features name="rivet_station"
+                                   parent="riveting_zone"
+                                   zone_size_x="0.500"
+                                   zone_size_y="0.350"
+                                   cabin_size_x="0.450"
+                                   cabin_size_y="0.300"
+                                   cabin_height="0.350"
+                                   press_offset_x="0"
+                                   press_offset_y="0.200"
+                                   include_press="false"/>
+
+  <!-- ===== V37 Rotary index table (rebuilt from disco giratorio.zip) ====
+       disc centre at the riveting_zone origin = world (0.692, 1.259, 1.000).
+       Mount radius 0.150 m so LOAD <-> RIVET are 0.300 m apart.
+         LOAD  mount  world (0.692, 1.109, 1.081)  - cobot side (south)
+         RIVET mount  world (0.692, 1.409, 1.081)  - press side (north)
+       Cobot at (0.950, 0.972, 0.550) -> LOAD horizontal distance
+       sqrt(0.258^2 + 0.137^2) = 0.292 m, well within 0.626 m reach. ===-->
+  <xacro:rotary_index_table_v37 name="rotary_table"
+                                parent="riveting_zone"
+                                xy_x="0.0" xy_y="0.0" z="0.0"
+                                mount_radius="0.150"/>
+
+  <!-- ===== V20: TWO copies of the REAL fixture on the disc ============
+       Each is a fixture_rivet with base + body + top solenoid + lateral
+       L/R solenoids + descending rivet piston.
+
+       Fixture A = OUTER (LOAD) - cobot places CAFI here, lateral
+                   solenoids energise to seat.
+       Fixture B = INNER (RIVET) - top solenoid + piston descend to
+                   rivet the seated CAFI.
+
+       Both are oriented with yaw=0 in their disc mount frame, which
+       means the fixture's BASE long-axis runs along the disc TANGENT
+       (link X of disc mount frame).  When the disc rotates 180 deg the
+       two fixtures swap stations and the CAFI orientation stays
+       consistent for the cobot pick/place poses (because both fixture
+       frames are pre-aligned the same way; the swap is symmetric).
+       =================================================================== -->
+  <xacro:fixture_rivet name="fixture_A"
+                       parent="rotary_table_load_mount"
+                       base_z="0.0"
+                       yaw="0.0"/>
+
+  <!-- V28: fixture_B mounted with yaw=pi in its initial rivet_mount
+       frame so that after the +-180 deg disc rotation that brings it
+       to LOAD, its world orientation is identity (same as fixture_A
+       at LOAD initially).  This satisfies the user's requirement that
+       both fixtures arrive at LOAD with the SAME orientation. -->
+  <xacro:fixture_rivet name="fixture_B"
+                       parent="rotary_table_rivet_mount"
+                       base_z="0.0"
+                       yaw="3.141592653589793"/>
+
+  <!-- V41 rivet gun ("pistolita"): mounted above the RIVET station
+       at world (0.692, 1.409, 1.420).  With V41 cabin_height=0.500
+       (canopy at z=1.500), the bracket hangs just below the canopy.
+       Tip at z=1.420 - (0.080 body + 0.095 to tip) = 1.245, which
+       clears the CAFI top on the cradle (1.136) by 109 mm.  No
+       collision with cobot reach envelope (LIFT_RIVETED max grasp
+       z=1.273).                                                      -->
+  <xacro:rivet_gun name="rivet_gun" parent="riveting_zone"
+                   xyz="0.0 0.150 0.420" rpy="0 0 0"/>
+
+  <!-- ===== V41 Vision zone (DXF #46: 150x151 mm @ (381.5, 215.1)) =====
+       V40 instantiated a workstation_table (15 mm grey plate, 150x151)
+       to support the fixture_vision STL.  The user flagged that plate
+       as "la mesita gris flotante" (zero-length legs made it look like
+       a floating plate at z=1.015).  V41 removes the workstation_table
+       and mounts the fixture_vision STL DIRECTLY on the mesa top; the
+       fixture STL is itself a 15 mm thick cradle plate so it provides
+       the visual base.                                                 -->
+  <!-- V44: vision zone moved 0.074 m WEST so the cobot has more
+       clearance reaching it (reach was OK at V43 but the wrist envelope
+       brushed the cradle wall during APPROACH_VISION).  V44 anchor is
+       at (0.750, 0.804).  Reach 3D from cobot (1.152, 1.049, 1.000)
+       to cradle CAFI centre (0.750, 0.804, 1.0275):
+         d = sqrt(0.402^2 + 0.245^2 + 0.028^2) = 0.471 m  (155 mm reach margin) -->
+  <link name="vision_zone"/>
+  <joint name="world_to_vision_zone" type="fixed">
+    <parent link="world"/>
+    <child  link="vision_zone"/>
+    <origin xyz="0.750 0.804 1.000" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:fixture_vision name="fixture_2" parent="vision_zone"
+                        base_z="0.0" yaw="0"/>
+
+  <!-- ===== V38 Cognex camera HANGING from cabin top ====================
+       Camera body directly above the fixture cámara at world (0.824,
+       0.804) with the body+lens at z = mesa_top + 0.320 = 1.320 m.
+       Suspension column hangs DOWN from the cabin top profile (z=2.07)
+       to the body (z=1.32) - arm_length=0 so the column is coaxial
+       with the body, no lateral kink.
+       The body is pitched +pi/2 about Y so its lens (local +X) points
+       straight DOWN at the CAFI on the fixture.                       -->
+  <!-- V40: camera raised 200 mm (z = 1.520 instead of 1.320) so the
+       cobot wrist envelope does not graze the camera body during
+       APPROACH_VISION/PLACE_VISION movements.  Mesa = 1.000, fixture
+       cradle top = 1.030, CAFI top on cradle = ~1.058.  At z=1.520,
+       lens-to-CAFI distance is 462 mm; still inside the Cognex 2800
+       working range (300-700 mm typical).  Column hangs from cabin top
+       at z=2.07 down to camera body at z=1.52 (length 550 mm).      -->
+  <!-- V44: camera moves WITH the vision fixture (same X shift of 0.074 m
+       to the west).  Lens stays coaxial with the cradle CAFI seat.  -->
+  <xacro:cognex_2800 name="cognex_camera" parent="world"
+                     xy_x="0.750" xy_y="0.804"
+                     z="1.520"
+                     yaw_to_target="0.0"
+                     pitch_to_target="1.5707963267948966"
+                     column_top_z="2.070" column_bottom_z="1.520"
+                     column_radius="0.012"
+                     arm_length="0.0"
+                     body_x="0.060" body_y="0.045" body_z="0.045"
+                     lens_radius="0.014" lens_length="0.028"/>
+
+  <!-- ===== V38 Lexium L03S mounted DIRECTLY on the mesa ================
+       NO external pedestal, NO hanging.  The canonical link0_base.STL
+       is the real cobot base plate; it bolts onto the mesa top at the
+       mesa centre.  mount_mode="floor" applies Rx(+pi/2) so the CAD
+       +Y arm axis maps to world +Z (cobot stands up).
+       Anchor:   xy = (1.152, 1.049)   = mesa centre shifted 0.10 m WEST
+                  z = 1.000             = mesa top
+       Pedestal: HEIGHT=0, RADIUS=0    -> no extra visual added.
+       yaw = 0 -> at q=0 the arm extends toward world +X.
+
+       Shift WHY: mesa exact centre (1.252, 1.049) leaves the IK with
+       only 0.043 m margin to the disc LOAD position (3D = 0.583 m vs
+       L03S reach 0.626 m) so the LOAD/RIVET poses cannot be solved
+       within the +/-2 pi joint limits.  Moving the cobot 0.10 m WEST
+       (toward the disc) gives the LOAD pose 0.139 m of margin while
+       keeping every other station well within reach.  0.10 m is the
+       MINIMUM shift that gets all 17 poses to converge - smaller
+       shifts still fail PLACE_LOAD_FIXTURE.
+
+       Reach check (3D from (1.152, 1.049, 1.000)):
+         conveyor PICK west  (1.235, 1.365, 1.135): d = 0.353
+         disc LOAD           (0.692, 1.109, 1.151): d = 0.487
+         fixture cámara      (0.824, 0.804, 1.065): d = 0.415
+         bin aceptado        (1.411, 0.679, 1.125): d = 0.469
+         bin rechazado       (1.110, 0.684, 1.125): d = 0.388                                   -->
+  <xacro:lexium_cobot_real name="lexium_cobot" parent="world"
+                           xy_x="1.152" xy_y="1.049"
+                           base_z="1.000" yaw="0.0"
+                           pedestal_height="0.0"
+                           pedestal_radius="0.0"
+                           mount_mode="floor"/>
+
+  <!-- ===== V37 Aluminum cabin (decorative enclosure) =====================
+       V37 cobot is FLOOR mounted; the cabin no longer carries it.
+       Cabin remains as a visible enclosure of the work cell with the
+       top profile at z=2.07 m.  cobot_mount_* are unused at this
+       call site but the macro signature still expects them - we
+       point them at a dummy z=2.020 well above the cobot's working
+       envelope so the (decorative) flange visual is not seen.     -->
+  <xacro:aluminum_cabin name="cabin" parent="world"
+                        x_min="0.30" x_max="2.20"
+                        y_min="0.30" y_max="1.80"
+                        top_z="2.070"
+                        cobot_mount_x="0.950"
+                        cobot_mount_y="0.972"
+                        cobot_mount_z="2.020"/>
+
+  <!-- ===== V36 Gripper (SolidWorks 99.5 mm Z reference aligned) =====
+       The user's SolidWorks measurement: the gripper mount centre
+       (where the gripper's mounting plate bolts to the cobot flange)
+       is 99.5 mm = 0.0995 m along the SW Z axis from the tip of the
+       closing tooth (the furthest point of the gripper).
+       Y+ is the SolidWorks CAD reference axis (NOT RViz/ROS Y+).
+       The conversion from SW to RViz follows the assembly Rx(-pi/2)
+       this URDF already applies via ASSEMBLY_RPY in new_gripper.xacro:
+         SW Y+ (CAD vertical) -> mesh Y -> after Rx(-pi/2) -> link -Z
+         SW Z+ (axial)       -> mesh Z -> after Rx(-pi/2) -> link -Y
+       So the SW "99.5 mm along Z" maps to "0.0995 m along link -Y"
+       in the gripper_base frame, which corresponds to the Euclidean
+       distance from the mounting-plate centre to the appendage tip
+       in our URDF:
+         appendage tip (link frame, closed)  = (0, +0.056, +0.080)
+         stump bottom-face centre            = (0, -0.014,  0.000)
+         |tip - centre| = sqrt(0.070^2 + 0.080^2) = 0.1063 m
+       The 6 mm Euclidean vs axial difference is mesh-tolerance:
+       the SW 99.5 mm is the axial distance along the tool axis;
+       our link Y component (0.070 m) is the lateral offset of the
+       tooth from the axis.  Setting mount_xyz so the stump bottom
+       face centre coincides with tool0:
+         mount_xyz = (0, -0.014, 0)  (negates Rz(pi) @ (0,-0.014,0) =
+                                       (0, +0.014, 0))
+         mount_yaw = pi              (keeps the closing tooth pointing
+                                       toward the CAFI when the cobot
+                                       is at HOME / PICK pose)
+       lexium_kinematics.GRASP_CENTER_OFFSET = (0, +0.014, +0.025) is
+       in lock-step (see scripts/lexium_kinematics.py).
+       The canonical URDF tool0 frame is NOT touched.                 -->
+  <!-- V41: gripper pulled 35 mm IN toward the cobot wrist so the
+       64 mm Ø mounting plate sits FLUSH against the visible flange
+       disc.  Diagnosis: the canonical link6_tool_flange.STL mesh ends
+       at link6_wrist3 Y=+0.033 m (the front face of the flange disc),
+       while joint_tool0 origin is at link6_wrist3 Y=+0.068 m; a
+       35 mm offset BEYOND the visible disc.  V36-V40 placed the plate
+       at tool0 (0, 0, 0), leaving a 35 mm visible air gap between
+       the flange disc front face and the plate back face.  V41 fixes
+       this: mount_xyz pulls the plate to tool0 (0, -0.035, 0) so the
+       plate visibly bolts against the flange disc front face.  XY
+       centroid alignment from V40 is preserved (+0.516 mm correction).
+       Net mount_xyz Y = -0.01385 (V40 centroid) - 0.0350 (flange pull-
+       back) = -0.04885 m.                                            -->
+  <!-- V43: gripper is now PART OF the cobot URDF, mounted INSIDE
+       lexium_cobot_with_final_gripper.xacro (tool0 -> gripper_base ->
+       stump/fixture/fixture1/neck/appendage -> tcp_link).  The working
+       TCP frame the rest of the planta uses is
+       "lexium_cobot_tcp_grasp_center".  No separate new_gripper macro
+       is instantiated.                                                  -->
+  <!-- (V42 new_gripper call deleted in V43.) -->
+
+
+  <!-- ===== V37 Control station (DXF #39 @ (241.6, -126.7) -> world
+       (0.684, 0.462), south of the mesa, OUTSIDE the mesa footprint.
+       size 0.483 x 0.254 m per DXF.                                  -->
+  <xacro:control_station name="control_station" parent="world"
+                         xy_x="0.684" xy_y="0.462" yaw="0"
+                         width="0.483" depth="0.254" height="1.200"/>
+
+  <!-- ===== Operator chair (preserved) ================================ -->
+  <xacro:macro name="operator_chair"
+               params="name parent x y seat_size_x seat_size_y
+                       seat_top_z backrest_height leg_radius">
+    <xacro:property name="seat_thick"  value="0.040"/>
+    <xacro:property name="back_thick"  value="0.040"/>
+    <xacro:property name="leg_h"       value="${seat_top_z - seat_thick}"/>
+    <link name="${name}_seat">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${seat_size_x} ${seat_size_y} ${seat_thick}"/></geometry>
+        <material name="chair_seat_mat"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}_seat" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_seat"/>
+      <origin xyz="${x} ${y} ${seat_top_z - seat_thick/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_back">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="${seat_size_x} ${back_thick} ${backrest_height}"/></geometry>
+        <material name="chair_back_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_seat_to_back" type="fixed">
+      <parent link="${name}_seat"/>
+      <child  link="${name}_back"/>
+      <origin xyz="0 ${-seat_size_y/2 + back_thick/2} ${seat_thick/2 + backrest_height/2}" rpy="0 0 0"/>
+    </joint>
+    <xacro:macro name="_chair_leg" params="suffix dx dy">
+      <link name="${name}_leg_${suffix}">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry><cylinder radius="${leg_radius}" length="${leg_h}"/></geometry>
+          <material name="chair_leg_mat"/>
+        </visual>
+      </link>
+      <joint name="${name}_seat_to_leg_${suffix}" type="fixed">
+        <parent link="${name}_seat"/>
+        <child  link="${name}_leg_${suffix}"/>
+        <origin xyz="${dx} ${dy} ${-seat_thick/2 - leg_h/2}" rpy="0 0 0"/>
+      </joint>
+    </xacro:macro>
+    <xacro:_chair_leg suffix="ff" dx="${ seat_size_x/2 - 0.030}" dy="${-seat_size_y/2 + 0.030}"/>
+    <xacro:_chair_leg suffix="fb" dx="${ seat_size_x/2 - 0.030}" dy="${ seat_size_y/2 - 0.030}"/>
+    <xacro:_chair_leg suffix="bf" dx="${-seat_size_x/2 + 0.030}" dy="${-seat_size_y/2 + 0.030}"/>
+    <xacro:_chair_leg suffix="bb" dx="${-seat_size_x/2 + 0.030}" dy="${ seat_size_y/2 - 0.030}"/>
+  </xacro:macro>
+
+  <xacro:operator_chair name="operator_chair" parent="world"
+                        x="0.684" y="0.150"
+                        seat_size_x="0.400" seat_size_y="0.300"
+                        seat_top_z="0.500" backrest_height="0.400"
+                        leg_radius="0.018"/>
+
+  <!-- ===== V38 Sensors (repositioned to new layout + west pick) ====== -->
+  <!-- Conveyor LEFT pick photoelectric: belt centred at (1.370, 1.365);
+       the pick is at world X = 1.235 (west end), so the sensor faces
+       NORTH across the belt right at the pick X.                      -->
+  <xacro:sick_photoelectric name="sensor_conveyor_end" parent="world"
+                            face_x="1.235" face_y="1.290" face_z="1.100"
+                            beam_yaw="1.5707963267948966"
+                            mesa_z="1.000" beam_len="0.150"/>
+
+  <!-- V41: rivet/LOAD photoelectric MOVED to the opposite side.  V37-
+       V40 placed it WEST of the LOAD fixture (face_x=0.500, beam east);
+       the user flagged it as colliding with the cobot's south-west
+       approach to LOAD.  V41 mounts it EAST of LOAD (face_x=0.884,
+       beam yaw=pi -> west-pointing beam) so the cobot reach corridor
+       between (1.152, 1.049) and LOAD (0.692, 1.109) stays clear.    -->
+  <xacro:sick_photoelectric name="sensor_rotary_load_fixture" parent="world"
+                            face_x="0.884" face_y="1.109" face_z="1.110"
+                            beam_yaw="3.141592653589793"
+                            mesa_z="1.000" beam_len="0.150"/>
+
+  <!-- Sensor west of vision cradle at world (0.824, 0.804).  Beam
+       yaw=0 (west-to-east).                                          -->
+  <!-- V44: sensor moves with the vision fixture (shifted west by 0.074 m).  -->
+  <xacro:sick_photoelectric name="sensor_vision_piece_present" parent="world"
+                            face_x="0.586" face_y="0.804" face_z="1.040"
+                            beam_yaw="0.0"
+                            mesa_z="1.000" beam_len="0.130"/>
+
+  <!-- ===== V38 Actuators ============================================== -->
+  <!-- Conveyor drive motor under EAST end of belt (V38 pick is on west). -->
+  <xacro:conveyor_drive_motor name="conveyor_drive_motor" parent="world"
+                              xy_x="1.550" xy_y="1.365" z="1.036"
+                              axis_yaw="1.5707963267948966"/>
+
+  <!-- V41: rotary_drive macro REMOVED.  V37/V38 installed a NEMA-17 +
+       planetary gearbox hanging UNDER the mesa (mesa_bottom_z=0.960
+       with the output shaft poking up through the mesa).  The user
+       flagged it as "el NEMA esta abajo" - the subterranean NEMA was
+       confusing.  V41 keeps ONLY the visible NEMA on top of the disco
+       gearbase to the EAST of the disc (the nemabase_1.STL already
+       instantiated by rotary_index_table_v37 at link X=+0.244 m =
+       world (0.936, 1.259, +0.026) ).  The belt_top + belt_bot
+       visuals (V40) connect that NEMA to the central sprocket.     -->
+
+  <!-- ===== V37 Pneumatics ============================================= -->
+  <!-- FRL stays south of the mesa, away from the floor-mounted cobot. -->
+  <xacro:pneumatic_air_supply name="pneumatic_air_supply" parent="world"
+                              xy_x="0.300" xy_y="0.380"
+                              base_z="0.0" yaw="0.0"/>
+
+</robot>

@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!--
+  cafi.xacro  -  V4 nested CAFI in lay-flat fixture
+
+  STL bbox (mm):   X=122.9  Y=25.1  Z=87.3      (bbox origin at min corner)
+
+  The fixture is now rotated Rx(pi/2) in V4 so its 30 mm dimension points
+  UP and its 108 mm dimension lies along the table.  The CAFI follows the
+  same rotation so it nests with the right axis up.
+
+  After Rx(pi/2) applied to the CAFI mesh:
+      mesh X = 122.9 mm  ->  link X  (length along table)
+      mesh Y =  25.1 mm  ->  link Z  (CAFI thickness pointing up)
+      mesh Z =  87.3 mm  ->  link -Y (CAFI long axis along table Y)
+
+  CAFI bbox after rotation + xyz offset:
+      link X = -0.0615 .. +0.0615   (122.9 mm centered on fixture)
+      link Y = -0.0437 .. +0.0437   ( 87.3 mm centered on fixture)
+      link Z =  0.000  ..  0.025    ( 25.1 mm thick, sits on fixture top)
+
+  The CAFI is XY-centred on the fixture link and rests on the fixture top
+  face (link Z = 0).  z_offset positions the CAFI link in the fixture
+  frame; in V4 the call site uses z_offset = 0.030 so the CAFI base sits
+  exactly on top of the 30 mm flat plate of the fixture (no
+  interpenetration, no float).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="cafi_part" params="name parent z_offset">
+    <link name="${name}">
+      <visual>
+        <origin xyz="-0.061468 0.043650 0.000000"
+                rpy="1.5707963267948966 0 0"/>
+        <geometry>
+          <mesh
+            filename="package://schneider_cell_description/meshes/cafi/cafi.STL"
+            scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="cafi_mat"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="0 0 ${z_offset}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+</robot>

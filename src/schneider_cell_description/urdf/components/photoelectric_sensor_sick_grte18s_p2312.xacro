@@ -1,0 +1,135 @@
+<?xml version="1.0"?>
+<!--
+  photoelectric_sensor_sick_grte18s_p2312.xacro  -  V14 NEW
+
+  Photoelectric presence sensor, real CAD: SICK GRTE18S-P2312.
+  Source STEP (user-supplied, real - NOT a proxy):
+      planta Schneider/Sensor fotoelétrico SICK GRTE18S-P2312.STEP  (3.5 MB)
+  Converted with gmsh (OpenCASCADE) ->
+      meshes/sensors/sick_grte18s_p2312/sick_grte18s_p2312.STL  (binary, mm)
+
+  Mesh facts (mm, STEP frame):
+      bbox  X[-9, 9]   Y[0, 38.1]   Z[-9, 9]
+      => M18 barrel-style body, axis along mesh +Y, 38.1 mm long, 18 mm
+         across the threaded barrel.  The OPTICAL FACE is the reduced-
+         diameter nose at mesh Y = 0 (~12 mm dia); the cable end is at
+         mesh Y = 38.1.
+
+  Macro `sick_photoelectric` convention:
+      - The sensor LINK's local +X axis = the optical beam direction.
+      - The optical face sits at the LINK origin (0,0,0).
+      - The body extends toward link -X; a clamp + arm + post + foot
+        bracket carries it down to the mesa so it never floats.
+      - Visual rpy = Rz(pi/2) maps mesh -Y (beam) -> link +X and
+        mesh +Y (body/cable) -> link -X.
+
+  Parameters:
+      name        link prefix
+      parent      parent link (usually world)
+      face_x/y/z  WORLD position of the optical face
+      beam_yaw    yaw so link +X points at the monitored piece
+      beam_pitch  pitch of the beam (0 = horizontal; V14 mounts all use 0)
+      mesa_z      world Z the bracket post reaches down to (default 1.20)
+      beam_len    length of the translucent aim-beam indicator
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="sick_photoelectric"
+               params="name parent face_x face_y face_z
+                       beam_yaw beam_pitch:=0 mesa_z:=1.20 beam_len:=0.12">
+
+    <!-- ===== sensor body (real CAD mesh) =========================== -->
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 1.5707963267948966"/>
+        <geometry>
+          <mesh
+            filename="package://schneider_cell_description/meshes/sensors/sick_grte18s_p2312/sick_grte18s_p2312.STL"
+            scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="sensor_sick_body"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${face_x} ${face_y} ${face_z}"
+              rpy="0 ${beam_pitch} ${beam_yaw}"/>
+    </joint>
+
+    <!-- ===== translucent aim-beam indicator (link +X) ============== -->
+    <link name="${name}_beam">
+      <visual>
+        <origin xyz="${beam_len/2} 0 0" rpy="0 1.5707963267948966 0"/>
+        <geometry><cylinder radius="0.0015" length="${beam_len}"/></geometry>
+        <material name="sensor_beam"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_beam" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_beam"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== mounting clamp around the M18 barrel ================== -->
+    <link name="${name}_clamp">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.026 0.034 0.034"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_clamp" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_clamp"/>
+      <origin xyz="-0.020 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== horizontal bracket arm (clamp -> post) ================ -->
+    <link name="${name}_arm">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.062 0.016 0.016"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_arm" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_arm"/>
+      <origin xyz="-0.050 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== vertical post down to the mesa ======================== -->
+    <!-- beam_pitch is ~0 for every V14 mount, so link -Z == world -Z
+         and the post length is simply face_z - mesa_z. -->
+    <xacro:property name="post_len" value="${face_z - mesa_z}"/>
+    <link name="${name}_post">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.011" length="${post_len}"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_post" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_post"/>
+      <origin xyz="-0.078 0 ${-post_len/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== foot plate on the mesa ================================ -->
+    <link name="${name}_foot">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.060 0.060 0.008"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_foot" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_foot"/>
+      <origin xyz="-0.078 0 ${-post_len + 0.004}" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

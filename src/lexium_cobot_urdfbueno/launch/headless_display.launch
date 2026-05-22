@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!-- Headless variant: publishes joint_states from a script (no GUI),
+     plus robot_state_publisher and RViz with the saved view.
+     The screenshot driver sets joints and triggers gnome-screenshot. -->
+<launch>
+  <param name="robot_description"
+         textfile="$(find lexium_cobot_urdfbueno)/urdf/lexium_cobot_l03s.urdf"/>
+  <node name="robot_state_publisher" pkg="robot_state_publisher"
+        type="robot_state_publisher"/>
+  <node name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find lexium_cobot_urdfbueno)/rviz/display.rviz"/>
+</launch>

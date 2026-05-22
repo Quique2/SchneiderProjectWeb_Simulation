@@ -1,0 +1,30 @@
+# Schneider Cell V20 - Global Parameters
+#
+# Loaded into the ROS parameter server by schneider_cell.launch.
+# Each node reads only the parameters it needs.
+
+cell:
+  # Cycle constants
+  rivet_duration_s: 30.0           # V20: V19 was 60
+  inspect_duration_s: 1.6
+  motion_segment_s: 1.8
+
+  # Geometric tolerances
+  pick_x_tol_m: 0.020
+  cafi_at_sensor_tol_m: 0.110
+
+  # Conveyor
+  belt_speed_mps: 0.10
+  min_separation_m: 0.250          # below this -> accumulation FAULT
+  spawn_guard_radius_m: 0.150
+
+  # Vision
+  pass_probability: 0.70           # 70% PASS / 30% FAIL
+
+  # Watchdog timeouts (state_manager)
+  wd_pick_s: 12.0
+  wd_place_s: 12.0
+  wd_seat_s: 6.0
+  wd_index_s: 6.0
+  wd_rivet_s: 40.0
+  wd_inspect_s: 5.0

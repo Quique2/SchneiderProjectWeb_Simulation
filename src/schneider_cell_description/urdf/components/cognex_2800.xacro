@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<!--
+  cognex_2800.xacro  -  V3 discreet overhead camera
+
+  Visual proxy for a Cognex In-Sight 2800 smart camera mounted overhead.
+
+  V3 vs V2:
+    - body and lens shrunk so the camera doesn't compete with the cobot
+    - column is thinner (0.018 m radius) and reaches all the way to the floor
+    - aim target lowered to 0.78 m (top of CAFI nested in fixture_2)
+
+  Frame chain (parent .. lens):
+      parent
+        + {name}_anchor      (at XY of camera, yawed toward target)
+            + {name}_column  (vertical post, floor to top)
+            + {name}_arm     (horizontal bracket from post to body)
+            + {name}_body    (camera body, pitched down toward target)
+                + {name}_lens
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="cognex_2800"
+               params="name parent xy_x xy_y z yaw_to_target pitch_to_target
+                       column_top_z column_bottom_z column_radius
+                       arm_length body_x body_y body_z
+                       lens_radius lens_length">
+
+    <link name="${name}_anchor"/>
+    <joint name="${parent}_to_${name}_anchor" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_anchor"/>
+      <origin xyz="${xy_x} ${xy_y} 0" rpy="0 0 ${yaw_to_target}"/>
+    </joint>
+
+    <xacro:property name="col_height" value="${column_top_z - column_bottom_z}"/>
+    <link name="${name}_column">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${column_radius}" length="${col_height}"/>
+        </geometry>
+        <material name="bracket_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_anchor_to_column" type="fixed">
+      <parent link="${name}_anchor"/>
+      <child  link="${name}_column"/>
+      <origin xyz="${-arm_length} 0 ${column_bottom_z + col_height/2}"
+              rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_arm">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 ${pi/2} 0"/>
+        <geometry>
+          <cylinder radius="0.008" length="${arm_length}"/>
+        </geometry>
+        <material name="bracket_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_column_to_arm" type="fixed">
+      <parent link="${name}_column"/>
+      <child  link="${name}_arm"/>
+      <origin xyz="${arm_length/2} 0 ${col_height/2}" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_body">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${body_x} ${body_y} ${body_z}"/>
+        </geometry>
+        <material name="camera_body_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_anchor_to_body" type="fixed">
+      <parent link="${name}_anchor"/>
+      <child  link="${name}_body"/>
+      <origin xyz="0 0 ${z}" rpy="0 ${pitch_to_target} 0"/>
+    </joint>
+
+    <link name="${name}_lens">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 ${pi/2} 0"/>
+        <geometry>
+          <cylinder radius="${lens_radius}" length="${lens_length}"/>
+        </geometry>
+        <material name="camera_lens_mat"/>
+      </visual>
+    </link>
+    <joint name="${name}_body_to_lens" type="fixed">
+      <parent link="${name}_body"/>
+      <child  link="${name}_lens"/>
+      <origin xyz="${body_x/2 + lens_length/2} 0 0" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

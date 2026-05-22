@@ -1,0 +1,149 @@
+================================================================================
+V43 cycle simulator -- 3 CAFIs end-to-end
+FK chain: new cobot URDF (lexium_cobot_with_final_gripper)
+TCP frame: lexium_cobot_tcp_grasp_center (offset (0.00025, -0.00975, 0.09175) in tool0)
+JOINT2_RPY: (0.0, 0.0, 0.05) (user URDF original)
+================================================================================
+
+==== CAFI #1  (verdict will be PASS) ====
+  CAFI spawn at suministro east end, conveyor delivers to PICK world (+1.2350, +1.3650, +1.0825)
+  TRAJ_PICK_CONV:
+    POSE_APPROACH_CONVEYOR         tcp=(+1.2350, +1.3650, +1.2025) (floor clr=+1.202 m)
+    POSE_PICK_CONVEYOR             tcp=(+1.2350, +1.3650, +1.0826) (floor clr=+1.083 m)
+    -> grasp centred on CAFI (PASS), err=0.06 mm
+    [GRIP] CLOSE jaw -> grasp_confirmed within 4.0s (geometric: tcp == CAFI centre)
+    POSE_LIFT_CONVEYOR             tcp=(+1.2350, +1.3649, +1.2324) (floor clr=+1.232 m)
+  TRAJ_PLACE_LOAD_FIXTURE:
+    POSE_APPROACH_LOAD_FIXTURE     tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_RELEASE_LOAD_FIXTURE      tcp=(+0.7407, +1.1081, +1.2210)
+    -> release at +100 mm above seat (PASS), err=4.55 mm
+    [GRIP] OPEN jaw -> release CAFI; settling under gravity
+    POSE_RETREAT_LOAD_FIXTURE      tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330)
+  [DISC] LOAD->RIVET index, [RIVET] press cycles
+  TRAJ_PICK_RIVETED:
+    POSE_APPROACH_PICK_RIVETED     tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_PICK_RIVETED              tcp=(+0.7370, +1.1090, +1.1235)
+    -> grasp centred on CAFI (PASS), err=0.04 mm
+    [GRIP] CLOSE jaw -> grasp riveted CAFI
+    POSE_LIFT_RIVETED              tcp=(+0.7370, +1.1090, +1.2735)
+  TRAJ_PLACE_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8240, +0.8040, +1.1475)
+    POSE_RELEASE_VISION            tcp=(+0.8240, +0.8040, +1.1275)
+    -> release at +100 mm above vision base (PASS), err=0.04 mm
+    [GRIP] OPEN jaw -> release; CAFI settles on vision cradle
+    POSE_RETREAT_VISION            tcp=(+0.8241, +0.8040, +1.1475)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330)
+  [VISION] camera inspect; verdict=PASS
+  TRAJ_PICK_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8240, +0.8040, +1.1475)
+    POSE_PLACE_VISION              tcp=(+0.8240, +0.8040, +1.0275)
+    -> grasp centred on CAFI (PASS), err=0.04 mm
+    [GRIP] CLOSE jaw -> grasp from vision cradle
+    POSE_RETREAT_VISION            tcp=(+0.8241, +0.8040, +1.1475)
+  TRAJ_PLACE_ACCEPT:
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.5800, +0.6790, +1.1375) (floor clr=+1.137 m)
+    POSE_DROP_ACCEPT_BIN           tcp=(+1.5800, +0.6790, +1.0175) (floor clr=+1.018 m)
+    [GRIP] OPEN jaw -> release CAFI into bin
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.5800, +0.6790, +1.1375) (floor clr=+1.137 m)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) (floor clr=+1.433 m)
+  CAFI #1 cycle complete  (overall: OK)
+
+==== CAFI #2  (verdict will be PASS) ====
+  CAFI spawn at suministro east end, conveyor delivers to PICK world (+1.2350, +1.3650, +1.0825)
+  TRAJ_PICK_CONV:
+    POSE_APPROACH_CONVEYOR         tcp=(+1.2350, +1.3650, +1.2025) (floor clr=+1.202 m)
+    POSE_PICK_CONVEYOR             tcp=(+1.2350, +1.3650, +1.0826) (floor clr=+1.083 m)
+    -> grasp centred on CAFI (PASS), err=0.06 mm
+    [GRIP] CLOSE jaw -> grasp_confirmed within 4.0s (geometric: tcp == CAFI centre)
+    POSE_LIFT_CONVEYOR             tcp=(+1.2350, +1.3649, +1.2324) (floor clr=+1.232 m)
+  TRAJ_PLACE_LOAD_FIXTURE:
+    POSE_APPROACH_LOAD_FIXTURE     tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_RELEASE_LOAD_FIXTURE      tcp=(+0.7407, +1.1081, +1.2210)
+    -> release at +100 mm above seat (PASS), err=4.55 mm
+    [GRIP] OPEN jaw -> release CAFI; settling under gravity
+    POSE_RETREAT_LOAD_FIXTURE      tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330)
+  [DISC] LOAD->RIVET index, [RIVET] press cycles
+  TRAJ_PICK_RIVETED:
+    POSE_APPROACH_PICK_RIVETED     tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_PICK_RIVETED              tcp=(+0.7370, +1.1090, +1.1235)
+    -> grasp centred on CAFI (PASS), err=0.04 mm
+    [GRIP] CLOSE jaw -> grasp riveted CAFI
+    POSE_LIFT_RIVETED              tcp=(+0.7370, +1.1090, +1.2735)
+  TRAJ_PLACE_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8240, +0.8040, +1.1475)
+    POSE_RELEASE_VISION            tcp=(+0.8240, +0.8040, +1.1275)
+    -> release at +100 mm above vision base (PASS), err=0.04 mm
+    [GRIP] OPEN jaw -> release; CAFI settles on vision cradle
+    POSE_RETREAT_VISION            tcp=(+0.8241, +0.8040, +1.1475)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330)
+  [VISION] camera inspect; verdict=PASS
+  TRAJ_PICK_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8240, +0.8040, +1.1475)
+    POSE_PLACE_VISION              tcp=(+0.8240, +0.8040, +1.0275)
+    -> grasp centred on CAFI (PASS), err=0.04 mm
+    [GRIP] CLOSE jaw -> grasp from vision cradle
+    POSE_RETREAT_VISION            tcp=(+0.8241, +0.8040, +1.1475)
+  TRAJ_PLACE_ACCEPT:
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.5800, +0.6790, +1.1375) (floor clr=+1.137 m)
+    POSE_DROP_ACCEPT_BIN           tcp=(+1.5800, +0.6790, +1.0175) (floor clr=+1.018 m)
+    [GRIP] OPEN jaw -> release CAFI into bin
+    POSE_APPROACH_ACCEPT_BIN       tcp=(+1.5800, +0.6790, +1.1375) (floor clr=+1.137 m)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) (floor clr=+1.433 m)
+  CAFI #2 cycle complete  (overall: OK)
+
+==== CAFI #3  (verdict will be FAIL) ====
+  CAFI spawn at suministro east end, conveyor delivers to PICK world (+1.2350, +1.3650, +1.0825)
+  TRAJ_PICK_CONV:
+    POSE_APPROACH_CONVEYOR         tcp=(+1.2350, +1.3650, +1.2025) (floor clr=+1.202 m)
+    POSE_PICK_CONVEYOR             tcp=(+1.2350, +1.3650, +1.0826) (floor clr=+1.083 m)
+    -> grasp centred on CAFI (PASS), err=0.06 mm
+    [GRIP] CLOSE jaw -> grasp_confirmed within 4.0s (geometric: tcp == CAFI centre)
+    POSE_LIFT_CONVEYOR             tcp=(+1.2350, +1.3649, +1.2324) (floor clr=+1.232 m)
+  TRAJ_PLACE_LOAD_FIXTURE:
+    POSE_APPROACH_LOAD_FIXTURE     tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_RELEASE_LOAD_FIXTURE      tcp=(+0.7407, +1.1081, +1.2210)
+    -> release at +100 mm above seat (PASS), err=4.55 mm
+    [GRIP] OPEN jaw -> release CAFI; settling under gravity
+    POSE_RETREAT_LOAD_FIXTURE      tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330)
+  [DISC] LOAD->RIVET index, [RIVET] press cycles
+  TRAJ_PICK_RIVETED:
+    POSE_APPROACH_PICK_RIVETED     tcp=(+0.7488, +1.1063, +1.2351)
+    POSE_PICK_RIVETED              tcp=(+0.7370, +1.1090, +1.1235)
+    -> grasp centred on CAFI (PASS), err=0.04 mm
+    [GRIP] CLOSE jaw -> grasp riveted CAFI
+    POSE_LIFT_RIVETED              tcp=(+0.7370, +1.1090, +1.2735)
+  TRAJ_PLACE_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8240, +0.8040, +1.1475)
+    POSE_RELEASE_VISION            tcp=(+0.8240, +0.8040, +1.1275)
+    -> release at +100 mm above vision base (PASS), err=0.04 mm
+    [GRIP] OPEN jaw -> release; CAFI settles on vision cradle
+    POSE_RETREAT_VISION            tcp=(+0.8241, +0.8040, +1.1475)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330)
+  [VISION] camera inspect; verdict=FAIL
+  TRAJ_PICK_VISION:
+    POSE_APPROACH_VISION           tcp=(+0.8240, +0.8040, +1.1475)
+    POSE_PLACE_VISION              tcp=(+0.8240, +0.8040, +1.0275)
+    -> grasp centred on CAFI (PASS), err=0.04 mm
+    [GRIP] CLOSE jaw -> grasp from vision cradle
+    POSE_RETREAT_VISION            tcp=(+0.8241, +0.8040, +1.1475)
+  TRAJ_PLACE_REJECT:
+    POSE_APPROACH_REJECT_BIN       tcp=(+1.3200, +0.6840, +1.1375) (floor clr=+1.137 m)
+    POSE_DROP_REJECT_BIN           tcp=(+1.3200, +0.6840, +1.0176) (floor clr=+1.018 m)
+    [GRIP] OPEN jaw -> release CAFI into bin
+    POSE_APPROACH_REJECT_BIN       tcp=(+1.3200, +0.6840, +1.1375) (floor clr=+1.137 m)
+    POSE_HOME                      tcp=(+1.1042, +0.8680, +1.4330) (floor clr=+1.433 m)
+  CAFI #3 cycle complete  (overall: OK)
+
+================================================================================
+Minimum tcp_grasp_center Z across ALL poses: 1.0175 m
+Floor clearance (TCP minus floor z=0):       1.0175 m
+================================================================================
+
+Overall: 3/3 CAFIs cycled
+Watchdogs tripped:  0
+FAULT events:       0
+Floor contacts:     0
+Plant collisions:   0  (see pose_collision_check_V43.txt)

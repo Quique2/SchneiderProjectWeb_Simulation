@@ -1,0 +1,213 @@
+<?xml version="1.0"?>
+<!--
+  fixture_rivet.xacro  -  V28 (per-user "additional Rx(pi)+Rz(pi)" on
+                                top of V27, only solenoid_left, both
+                                fixtures arrive at LOAD with the SAME
+                                world orientation via yaw=pi on B)
+  ===========================================================================
+  USER BRIEF (section A)
+  ===========================================================================
+   1. Apply Rx(pi) and Rz(pi) on top of V27's mesh orientation.
+      V27 used rpy=(-pi/2, 0, 0) i.e. R_v27 = Rx(-pi/2).
+      Apply Rx(pi)*Rz(pi) in the V27 visual frame:
+          R_new = R_v27 * Rx(pi) * Rz(pi)
+                = Rx(-pi/2) * Rx(pi) * Rz(pi)
+                = Rx( pi/2) * Rz(pi)
+      Equivalent URDF rpy:  R = Rz(yaw)*Ry(pitch)*Rx(roll) with
+          roll = +pi/2  pitch = 0  yaw = pi
+      => FIX_VIS_RPY = "1.5707963267948966 0 3.1415926535897932"
+
+      Verification of mesh -> rotated bboxes (mesh in mm):
+          base  X[120, 300]  Y[0, 30]  Z[0, 60]
+                Rx(pi/2): (x,y,z) -> (x, -z, y)  => X[120,300] Y[-60,0]  Z[0,30]
+                Rz(pi)  : (x,y,z) -> (-x,-y,z)  => X[-300,-120] Y[0,60] Z[0,30]
+          body  X[120, 300]  Y[0, 30]  Z[62, 113]
+                                                  X[-300,-120] Y[62,113] Z[0,30]
+
+      Translate offset chosen so that body Y-center lands on cafi_seat Y=0,
+      body X-center lands on cafi_seat X=+0.045, and base bottom sits on
+      link Z=0 (the disc surface):
+          T = (+0.255, -0.0875, 0.000)
+      Resulting link-frame bboxes:
+          base  X[-0.045, +0.135]  Y[-0.0875, -0.0275]  Z[0, +0.030]
+          body  X[-0.045, +0.135]  Y[-0.0255, +0.0255]  Z[0, +0.030]
+          piston(left) X[+0.113, +0.253]  Y[-0.0565, +0.0035]  Z[0, +0.039]
+      cafi_seat at link (0.045, 0, 0.072) sits 12 mm above the body
+      cradle top (= CAFI bottom on body top).
+
+   2. NO se rotó el CAFI; se rotó el fixture.
+
+   3. The base sits ON the disc (link Z = 0..30 mm above the load_mount
+      frame, which is itself 10 mm above the disc top).
+
+   4. ONLY solenoid_left.  The solenoid_right joint and link were never
+      re-added.  V25 already removed it; V28 confirms by inspection.
+
+   5. Both fixtures must arrive at LOAD with the SAME world orientation.
+      Disc rotates +-180 deg between LOAD and RIVET.  V27 mounted both
+      fixtures with yaw=0; result: fixture_B at LOAD showed yaw=pi
+      relative to fixture_A at LOAD.  V28 mounts fixture_B with yaw=pi
+      in its initial rivet_mount frame (see schneider_cell.urdf.xacro),
+      so after the disc swap fixture_B arrives at LOAD with world
+      orientation = Rz(pi) * Rz(pi) = identity (same as fixture_A).
+
+   6. cafi_seat preserved at link (0.045, 0, 0.072) so the V26/V27
+      IK-resolved PLACE_LOAD_FIXTURE and PICK_RIVETED poses still land
+      on world (1.716, 1.175, 1.292) for whichever fixture is at LOAD.
+
+  Macro contract: name + parent + base_z + yaw  (UNCHANGED).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Shared assembly transform: every visual carries the same xyz/rpy
+       so the as-exported assembly relationships between base, body,
+       piston are preserved. -->
+  <!-- V29: Apply YAW 180 deg additional to V28's rotation, so the
+       fixture's "front" face (where the piston/solenoid extends from
+       the body) now faces the OTHER side.  V28 had Rx(+pi/2)*Rz(pi)
+       which put piston east of body (+X side).  V29 drops the Rz(pi)
+       and uses Rx(+pi/2) only -> piston now extends WEST of body
+       (-X side), which is the LEFT side from the cobot's POV looking
+       north into the cell.
+
+       Mesh -> rotated bboxes (mesh in mm):
+           Rx(+pi/2): (x,y,z) -> (x, -z, y)
+           base   X[120,300] Y[0,30] Z[0,60] -> X[+120,+300] Y[-60,0] Z[0,30]
+           body   X[120,300] Y[0,30] Z[62,113] -> X[+120,+300] Y[-113,-62] Z[0,30]
+           piston X[2,142] Y[0,39] Z[31,91]   -> X[+2,+142] Y[-91,-31] Z[0,39]
+
+       Translate to place body Y-center on seat Y=0 and body X-center
+       on seat X=+0.045:
+           body X center post-rot = (120+300)/2 = +210 mm -> shift X by
+             +45-210 = -165 mm -> FIX_VIS_XYZ.x = -0.165
+           body Y center post-rot = (-113 + -62)/2 = -87.5 mm -> shift Y
+             by 0 - (-87.5) = +87.5 mm -> FIX_VIS_XYZ.y = +0.0875
+           base bottom post-rot Z = 0 -> already at link Z=0 -> .z=0.000
+
+       Resulting link-frame bboxes (V29):
+           base   X[-0.045, +0.135]  Y[+0.0275, +0.0875]  Z[ 0, +0.030]
+           body   X[-0.045, +0.135]  Y[-0.0255, +0.0255]  Z[ 0, +0.030]
+           piston X[-0.163, -0.023]  Y[-0.0035, +0.0565]  Z[ 0, +0.039]
+       For fixture_A at LOAD (link X=world X), piston in world X is
+           [1.508, 1.648], i.e., WEST of fixture origin 1.671 = LEFT
+           from cobot at south.  Body at world X centered on 1.716
+           (i.e., +0.045 east of fixture origin) and Y centered on
+           1.175 (fixture origin Y).  Base extends NORTH of body (Y
+           +0.027 to +0.0875), i.e., toward the disc center / rivet
+           station - that's the BACK of the fixture from cobot POV. -->
+  <xacro:property name="FIX_VIS_XYZ" value="-0.165 +0.0875 0.000"/>
+  <xacro:property name="FIX_VIS_RPY" value="1.5707963267948966 0 0"/>
+
+  <xacro:macro name="fixture_rivet" params="name parent base_z yaw">
+
+    <link name="${name}"/>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="0 0 ${base_z}" rpy="0 0 ${yaw}"/>
+    </joint>
+
+    <link name="${name}_base">
+      <visual>
+        <origin xyz="${FIX_VIS_XYZ}" rpy="${FIX_VIS_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/fixtures/rivet_final/fixture_rivet_final_base.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="fixture_rivet_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_base" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_base"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_body">
+      <visual>
+        <origin xyz="${FIX_VIS_XYZ}" rpy="${FIX_VIS_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/fixtures/rivet_final/fixture_rivet_final_body.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="fixture_rivet_body"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_body" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_body"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${name}_solenoid_left">
+      <visual>
+        <origin xyz="${FIX_VIS_XYZ}" rpy="${FIX_VIS_RPY}"/>
+        <geometry>
+          <mesh filename="package://schneider_cell_description/meshes/fixtures/rivet_final/fixture_rivet_final_piston.STL"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="fixture_rivet_solenoid"/>
+      </visual>
+    </link>
+    <!-- V30 FIX B: solenoid offset and stroke increased so that the
+         piston body is clearly separated from the fixture body and
+         the actuation is visible.
+
+         V29 had origin xyz=(0,0,0); the piston bbox in link frame was
+         X[-0.163, -0.023], i.e. its inner face touched the fixture body
+         at X=-0.023 with no air gap.  V30 shifts the joint origin
+         15 mm further in -X so the rest position of the piston is
+         X[-0.178, -0.038], i.e. 38 mm clear of the body face.
+
+         The prismatic stroke is also expanded from 10 mm to 30 mm so
+         that when rotary_fixture_sim drives the solenoid to its
+         lower limit the visual displacement of the piston (and any
+         attached settle assist on the CAFI) is clearly visible.
+         The sim node will still drive the joint to its `lower` limit
+         to "activate" — the larger lower=-0.030 simply produces a
+         bigger visible travel. -->
+    <joint name="${name}_solenoid_left_joint" type="prismatic">
+      <parent link="${name}"/>
+      <child  link="${name}_solenoid_left"/>
+      <origin xyz="-0.015 0 0" rpy="0 0 0"/>
+      <axis xyz="-1 0 0"/>
+      <limit lower="-0.030" upper="0.000"
+             effort="80.0" velocity="0.15"/>
+      <dynamics damping="0.8" friction="0.3"/>
+    </joint>
+
+    <!-- NO solenoid_right.  V25 removed it per the user brief and V28
+         keeps it removed.  Confirmed by inspection: no
+         "${name}_solenoid_right" link or "_joint" anywhere. -->
+
+    <link name="${name}_piston"/>
+    <joint name="${name}_piston_joint" type="prismatic">
+      <parent link="${name}"/>
+      <child  link="${name}_piston"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 0 -1"/>
+      <limit lower="-0.030" upper="0.000"
+             effort="500.0" velocity="0.20"/>
+      <dynamics damping="2.0" friction="1.0"/>
+    </joint>
+
+    <!-- V42 cafi_seat correction: V41 had seat at link (0.045, 0,
+         0.072).  With Rx(pi) the CAFI link Z+ flips so the CAFI body
+         occupied fixture Z[0.047, 0.072], leaving a 17 mm air gap
+         between the CAFI's lowest face and the fixture body top
+         (at fixture Z=0.030).  The user saw this as "CAFI flota un
+         poco arriba".  V42 lowers seat Z by 17 mm so the CAFI lowest
+         face rests EXACTLY on the body top:
+            seat_z (new) = 0.030 (body top) + CAFI_LZ (0.025) = 0.055
+         The Rx(pi) rotation is preserved (CAFI top still pointing
+         upward in world).                                            -->
+    <link name="${name}_cafi_seat"/>
+    <joint name="${name}_to_cafi_seat" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_cafi_seat"/>
+      <origin xyz="0.045 0.0 0.055" rpy="3.141592653589793 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

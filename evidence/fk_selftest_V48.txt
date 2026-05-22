@@ -1,0 +1,22 @@
+==============================================================================
+V43 Lexium kinematics SELF-TEST  (new URDF + integrated final gripper)
+==============================================================================
+WORLD_COBOT_XY = (1.152, 1.049)
+WORLD_COBOT_Z  = 1.0 m
+WORLD_COBOT_RPY= (1.5707963267948966, 0.0, 0.0)  (floor mount Rx(+pi/2))
+JOINT2_RPY     = (0.0, 0.0, 0.05)  (user URDF original CAD)
+GRASP_CENTER_OFFSET (tool0->tcp) = (0.00025, -0.00975, 0.09175)
+
+base->tool0 (q=0)  xyz=(+0.1053, +0.8101, +0.2745)  rpy=(+0.000, -0.000, +0.050)
+world->tool0 (q=0) xyz=(+1.2573, +0.7745, +1.8101)  rpy=(+1.571, -0.050, +0.000)
+world->tcp_grasp_center (q=0) xyz=(+1.2580, +0.6827, +1.8004)
+
+=== V43 REAL HOME (J1=0,J2=0,J3=0,J4=+90,J5=-90,J6=0) ===
+base->tool0 (HOME) xyz=(-0.0621, +0.5241, +0.1807)  rpy=(+1.621, -1.571, +0.000)
+world->tool0 (HOME) xyz=(+1.0899, +0.8683, +1.5241)  rpy=(-3.092, -0.000, -1.571)
+world->tcp (HOME) xyz=(+1.1042, +0.8680, +1.4330)
+
+IK test target = (1.235, 1.365, 1.0825)  (PICK conveyor)
+  q_sol = [-1.391, 0.926, 0.496, 1.214, -2.094, 0.328]
+  achieved = (1.2350, 1.3650, 1.0825)
+  err = 0.03 mm  (CONVERGED in 18 iters)

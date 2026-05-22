@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<!--
+  plant_table.xacro  -  V8 common plant platform
+                        V9: callsite size_y bumped 1.500 -> 1.600 and
+                        centre y shifted 1.130 -> 1.150 so the V9 hollow
+                        bins fit with a comfortable south margin.  The
+                        macro itself is unchanged - all dimensions are
+                        parameters and consumers tune them.
+
+  Single large industrial table that hosts the WHOLE process: conveyor 1,
+  suministro CAFI, quality bins, riveting station + fixture + CAFI, vision
+  station + fixture + CAFI, cobot linear rail with the Lexium on top, and
+  the Cognex column.  Everything that used to sit on the floor in V7 is
+  now lifted onto this table.
+
+  Geometry:
+      worktop:            box (size_x x size_y x thickness)
+      4 box-section legs: at the corners, inset by leg_inset
+      2 lower stretchers: long-side rails near the floor for a heavy
+                          fab-table look
+      1 cross stretcher:  short-side rail near the floor
+
+  Parameters:
+      name        link name prefix (the worktop link will be <name>)
+      parent      the link to attach the table to (typically 'world')
+      xy_x, xy_y  world XY of the worktop centre
+      size_x      X length of the worktop (in metres)
+      size_y      Y length of the worktop
+      top_z       world Z of the worktop TOP surface (= 1.20 m in V8)
+      thickness   worktop slab thickness
+      leg_section box-section leg edge (square cross-section)
+      leg_inset   distance from each leg centre to the nearest worktop
+                  edge along both X and Y
+      stretcher_z world Z of the centre of the lower stretcher rails
+      stretcher_t cross-section side of the stretcher box
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="_pt_leg"
+               params="name parent suffix dx dy leg_section leg_length top_z
+                       thickness">
+    <link name="${name}_leg_${suffix}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${leg_section} ${leg_section} ${leg_length}"/>
+        </geometry>
+        <material name="plant_table_leg"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_leg_${suffix}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_leg_${suffix}"/>
+      <origin xyz="${dx} ${dy} ${-(thickness/2) - leg_length/2}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="_pt_stretcher_x"
+               params="name parent suffix dx dy length section z_in_table_frame">
+    <link name="${name}_stretcher_${suffix}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${length} ${section} ${section}"/>
+        </geometry>
+        <material name="plant_table_frame"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_stretcher_${suffix}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_stretcher_${suffix}"/>
+      <origin xyz="${dx} ${dy} ${z_in_table_frame}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="_pt_stretcher_y"
+               params="name parent suffix dx dy length section z_in_table_frame">
+    <link name="${name}_stretcher_${suffix}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${section} ${length} ${section}"/>
+        </geometry>
+        <material name="plant_table_frame"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_stretcher_${suffix}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}_stretcher_${suffix}"/>
+      <origin xyz="${dx} ${dy} ${z_in_table_frame}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="plant_table"
+               params="name parent xy_x xy_y size_x size_y
+                       top_z thickness leg_section leg_inset
+                       stretcher_section">
+
+    <!-- ============ worktop slab ====================================== -->
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${size_x} ${size_y} ${thickness}"/>
+        </geometry>
+        <material name="plant_table_top"/>
+      </visual>
+    </link>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xy_x} ${xy_y} ${top_z - thickness/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ top-surface frame ridge ========================== -->
+    <!-- a thin lip running around the worktop perimeter, mostly cosmetic -->
+    <xacro:property name="lip_t" value="0.012"/>
+    <xacro:property name="lip_h" value="0.010"/>
+    <link name="${name}_lip_n">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${size_x} ${lip_t} ${lip_h}"/>
+        </geometry>
+        <material name="plant_table_frame"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_lip_n" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_lip_n"/>
+      <origin xyz="0 ${ size_y/2 - lip_t/2} ${thickness/2 + lip_h/2}" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_lip_s">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${size_x} ${lip_t} ${lip_h}"/>
+        </geometry>
+        <material name="plant_table_frame"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_lip_s" type="fixed">
+      <parent link="${name}"/>
+      <child  link="${name}_lip_s"/>
+      <origin xyz="0 ${-size_y/2 + lip_t/2} ${thickness/2 + lip_h/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ============ 4 corner legs ===================================== -->
+    <xacro:property name="leg_length" value="${top_z - thickness}"/>
+
+    <xacro:_pt_leg name="${name}" parent="${name}" suffix="pp"
+                   dx="${ size_x/2 - leg_inset}" dy="${ size_y/2 - leg_inset}"
+                   leg_section="${leg_section}" leg_length="${leg_length}"
+                   top_z="${top_z}" thickness="${thickness}"/>
+    <xacro:_pt_leg name="${name}" parent="${name}" suffix="pn"
+                   dx="${ size_x/2 - leg_inset}" dy="${-size_y/2 + leg_inset}"
+                   leg_section="${leg_section}" leg_length="${leg_length}"
+                   top_z="${top_z}" thickness="${thickness}"/>
+    <xacro:_pt_leg name="${name}" parent="${name}" suffix="np"
+                   dx="${-size_x/2 + leg_inset}" dy="${ size_y/2 - leg_inset}"
+                   leg_section="${leg_section}" leg_length="${leg_length}"
+                   top_z="${top_z}" thickness="${thickness}"/>
+    <xacro:_pt_leg name="${name}" parent="${name}" suffix="nn"
+                   dx="${-size_x/2 + leg_inset}" dy="${-size_y/2 + leg_inset}"
+                   leg_section="${leg_section}" leg_length="${leg_length}"
+                   top_z="${top_z}" thickness="${thickness}"/>
+
+    <!-- ============ lower stretchers for visual robustness ============ -->
+    <!-- length along X, near the legs on the long sides (north and south) -->
+    <xacro:property name="stretch_z_local" value="${-(thickness/2) - (leg_length - 0.20)}"/>
+    <xacro:property name="stretch_x_len"   value="${size_x - 2*leg_inset}"/>
+    <xacro:property name="stretch_y_len"   value="${size_y - 2*leg_inset}"/>
+
+    <xacro:_pt_stretcher_x name="${name}" parent="${name}" suffix="n"
+                           dx="0" dy="${ size_y/2 - leg_inset}"
+                           length="${stretch_x_len}"
+                           section="${stretcher_section}"
+                           z_in_table_frame="${stretch_z_local}"/>
+    <xacro:_pt_stretcher_x name="${name}" parent="${name}" suffix="s"
+                           dx="0" dy="${-size_y/2 + leg_inset}"
+                           length="${stretch_x_len}"
+                           section="${stretcher_section}"
+                           z_in_table_frame="${stretch_z_local}"/>
+    <xacro:_pt_stretcher_y name="${name}" parent="${name}" suffix="cross"
+                           dx="0" dy="0"
+                           length="${stretch_y_len}"
+                           section="${stretcher_section}"
+                           z_in_table_frame="${stretch_z_local}"/>
+
+  </xacro:macro>
+
+</robot>

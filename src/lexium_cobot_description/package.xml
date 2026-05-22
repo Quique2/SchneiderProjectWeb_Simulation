@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>lexium_cobot_description</name>
+  <version>1.0.0</version>
+  <description>
+    URDF/xacro description of the Schneider Electric Lexium Cobot
+    LXMRL03S0000 reconstructed from the 12 visual STL meshes provided by
+    the user (in "planta Schneider/Cobot/").  Articulated 6-DOF revolute
+    chain with joint limits matching the LXMRL03S0000 datasheet.  Used
+    standalone (display_l03s.launch) and also as the cobot of the
+    schneider_cell_description planta (V30 "hanging cobot" layout).
+  </description>
+  <maintainer email="miguelaor681@outlook.com">student</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>urdf</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz</exec_depend>
+</package>

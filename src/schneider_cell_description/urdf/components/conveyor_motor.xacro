@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<!--
+  conveyor_motor.xacro  -  V14 NEW
+
+  Drive gear-motor for Conveyor 1.  Represents the belt actuation at the
+  drag end of the conveyor.
+
+  CAD search (per the brief, section 3 / 8): looked for a downloadable
+  STEP/URDF of a small conveyor gear-motor on GrabCAD, TraceParts,
+  3DContentCentral, 3Dfindit and Mitsubishi-FA.  All usable hits sit
+  behind account logins / interactive catalog exporters and could not
+  be fetched + converted head-less in this environment.  This component
+  is therefore a CREDIBLE INDUSTRIAL PROXY built from primitives:
+  output shaft + coupling + gearbox housing + motor can + fan cover +
+  terminal box + mesa foot.  It is intentionally shaped like a real
+  inline gear-motor, not a generic cylinder.
+
+  Convention: local +X = output-shaft direction.  Place the macro with
+  axis_yaw so the shaft couples into the conveyor end roller.
+
+  Future PLC signal: DO_conveyor_motor_run  (digital output, PLC -> VFD/
+  contactor that energises this motor).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="conveyor_drive_motor"
+               params="name parent xy_x xy_y z axis_yaw">
+
+    <!-- ===== assembly anchor (origin = output-shaft tip) =========== -->
+    <link name="${name}"/>
+    <joint name="${parent}_to_${name}" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="${name}"/>
+      <origin xyz="${xy_x} ${xy_y} ${z}" rpy="0 0 ${axis_yaw}"/>
+    </joint>
+
+    <!-- ===== output shaft (local +X) =============================== -->
+    <link name="${name}_shaft">
+      <visual>
+        <origin xyz="0.0125 0 0" rpy="0 1.5707963267948966 0"/>
+        <geometry><cylinder radius="0.006" length="0.025"/></geometry>
+        <material name="motor_shaft"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_shaft" type="fixed">
+      <parent link="${name}"/><child link="${name}_shaft"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== flexible coupling to the roller shaft ================= -->
+    <link name="${name}_coupling">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 1.5707963267948966 0"/>
+        <geometry><cylinder radius="0.011" length="0.018"/></geometry>
+        <material name="motor_terminal"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_coupling" type="fixed">
+      <parent link="${name}"/><child link="${name}_coupling"/>
+      <origin xyz="0.028 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== gearbox housing ======================================= -->
+    <link name="${name}_gearbox">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.052 0.060 0.060"/></geometry>
+        <material name="motor_housing"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_gearbox" type="fixed">
+      <parent link="${name}"/><child link="${name}_gearbox"/>
+      <origin xyz="-0.026 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== motor can ============================================= -->
+    <link name="${name}_can">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 1.5707963267948966 0"/>
+        <geometry><cylinder radius="0.027" length="0.076"/></geometry>
+        <material name="motor_can"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_can" type="fixed">
+      <parent link="${name}"/><child link="${name}_can"/>
+      <origin xyz="-0.090 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== fan / end cover ======================================= -->
+    <link name="${name}_fan">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 1.5707963267948966 0"/>
+        <geometry><cylinder radius="0.030" length="0.024"/></geometry>
+        <material name="motor_terminal"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_fan" type="fixed">
+      <parent link="${name}"/><child link="${name}_fan"/>
+      <origin xyz="-0.140 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== terminal / junction box on top of the motor =========== -->
+    <link name="${name}_terminal">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.046 0.040 0.030"/></geometry>
+        <material name="motor_terminal"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_terminal" type="fixed">
+      <parent link="${name}"/><child link="${name}_terminal"/>
+      <origin xyz="-0.082 0 0.040" rpy="0 0 0"/>
+    </joint>
+
+    <!-- ===== mesa foot under the gearbox =========================== -->
+    <link name="${name}_foot">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.072 0.072 0.006"/></geometry>
+        <material name="bracket_steel"/>
+      </visual>
+    </link>
+    <joint name="${name}_to_foot" type="fixed">
+      <parent link="${name}"/><child link="${name}_foot"/>
+      <origin xyz="-0.026 0 -0.033" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+
+</robot>
