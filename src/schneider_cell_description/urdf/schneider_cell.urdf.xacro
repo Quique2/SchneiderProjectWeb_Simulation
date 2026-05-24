@@ -242,7 +242,10 @@
   <!-- V38: process_platform.xacro removed (process platform deleted in V37). -->
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/workstation.xacro"/>
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/conveyor.xacro"/>
-  <xacro:include filename="$(find schneider_cell_description)/urdf/components/fixture_rivet.xacro"/>
+  <!-- V52: fixture_rivet.xacro REMOVED.  The rivet fixtures are now part
+       of the new turntable_rivet_cell URDF (rivet_fixture_1_link +
+       rivet_fixture_2_link with their fixed pistons). -->
+  <!-- <xacro:include filename="$(find schneider_cell_description)/urdf/components/fixture_rivet.xacro"/> -->
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/fixture_vision.xacro"/>
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/cafi.xacro"/>
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/cognex_2800.xacro"/>
@@ -254,8 +257,14 @@
        is no longer included or instantiated. -->
   <!-- <xacro:include filename="$(find schneider_cell_description)/urdf/components/new_gripper.xacro"/> -->
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/riveting_station.xacro"/>
-  <!-- V37: rotary_index_table replaced with the STL-based V37 rebuild. -->
-  <xacro:include filename="$(find schneider_cell_description)/urdf/components/rotary_index_table_v37.xacro"/>
+  <!-- V52: rotary_index_table_v37.xacro REMOVED.  The new turntable
+       package supplies the disc, base, NEMA, belt, sensor and BOTH
+       fixtures in a single URDF (turntable_rivet_cell.urdf).  We wrap
+       it in a xacro macro (turntable_rivet_cell.xacro) so the planta
+       mounts it with a SINGLE fixed transform without touching the
+       internal layout. -->
+  <!-- <xacro:include filename="$(find schneider_cell_description)/urdf/components/rotary_index_table_v37.xacro"/> -->
+  <xacro:include filename="$(find turntable_rivet_cell_description)/urdf/turntable_rivet_cell.xacro"/>
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/control_station.xacro"/>
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/photoelectric_sensor_sick_grte18s_p2312.xacro"/>
   <xacro:include filename="$(find schneider_cell_description)/urdf/components/conveyor_motor.xacro"/>
@@ -458,58 +467,32 @@
                                    press_offset_y="0.200"
                                    include_press="false"/>
 
-  <!-- ===== V37 Rotary index table (rebuilt from disco giratorio.zip) ====
-       disc centre at the riveting_zone origin = world (0.692, 1.259, 1.000).
-       Mount radius 0.150 m so LOAD <-> RIVET are 0.300 m apart.
-         LOAD  mount  world (0.692, 1.109, 1.081)  - cobot side (south)
-         RIVET mount  world (0.692, 1.409, 1.081)  - press side (north)
-       Cobot at (0.950, 0.972, 0.550) -> LOAD horizontal distance
-       sqrt(0.258^2 + 0.137^2) = 0.292 m, well within 0.626 m reach. ===-->
-  <xacro:rotary_index_table_v37 name="rotary_table"
-                                parent="riveting_zone"
-                                xy_x="0.0" xy_y="0.0" z="0.0"
-                                mount_radius="0.150"/>
+  <!-- ===== V52 Turntable rivet cell (drop-in from user's package) =======
+       The whole rivet station (rotating disc, NEMA + base, belt, two
+       fixtures with their fixed pistons, photoelectric sensor pedestal,
+       sensor body + lens + light ray, CAFI lateral target frames and
+       pick frames) is supplied by turntable_rivet_cell_description's
+       URDF.  We wrap it as a xacro macro and instantiate it with a
+       SINGLE transform from riveting_zone.
 
-  <!-- ===== V20: TWO copies of the REAL fixture on the disc ============
-       Each is a fixture_rivet with base + body + top solenoid + lateral
-       L/R solenoids + descending rivet piston.
-
-       Fixture A = OUTER (LOAD) - cobot places CAFI here, lateral
-                   solenoids energise to seat.
-       Fixture B = INNER (RIVET) - top solenoid + piston descend to
-                   rivet the seated CAFI.
-
-       Both are oriented with yaw=0 in their disc mount frame, which
-       means the fixture's BASE long-axis runs along the disc TANGENT
-       (link X of disc mount frame).  When the disc rotates 180 deg the
-       two fixtures swap stations and the CAFI orientation stays
-       consistent for the cobot pick/place poses (because both fixture
-       frames are pre-aligned the same way; the swap is symmetric).
-       =================================================================== -->
-  <xacro:fixture_rivet name="fixture_A"
-                       parent="rotary_table_load_mount"
-                       base_z="0.0"
-                       yaw="0.0"/>
-
-  <!-- V28: fixture_B mounted with yaw=pi in its initial rivet_mount
-       frame so that after the +-180 deg disc rotation that brings it
-       to LOAD, its world orientation is identity (same as fixture_A
-       at LOAD initially).  This satisfies the user's requirement that
-       both fixtures arrive at LOAD with the SAME orientation. -->
-  <xacro:fixture_rivet name="fixture_B"
-                       parent="rotary_table_rivet_mount"
-                       base_z="0.0"
-                       yaw="3.141592653589793"/>
-
-  <!-- V41 rivet gun ("pistolita"): mounted above the RIVET station
-       at world (0.692, 1.409, 1.420).  With V41 cabin_height=0.500
-       (canopy at z=1.500), the bracket hangs just below the canopy.
-       Tip at z=1.420 - (0.080 body + 0.095 to tip) = 1.245, which
-       clears the CAFI top on the cradle (1.136) by 109 mm.  No
-       collision with cobot reach envelope (LIFT_RIVETED max grasp
-       z=1.273).                                                      -->
-  <xacro:rivet_gun name="rivet_gun" parent="riveting_zone"
-                   xyz="0.0 0.150 0.420" rpy="0 0 0"/>
+       Internal layout is byte-for-byte the original URDF:
+         - base_link is fixed to riveting_zone (does NOT rotate).
+         - table_rotation_joint (revolute, axis +Z, +-pi) drives
+           turntable_link.
+         - Both fixtures parent to turntable_link, so they rotate
+           with the disc.  Fixture 2 is mounted 180 deg from fixture 1.
+         - photoelectric sensor parents to base_link, so it stays
+           fixed and only "sees" fixture 1 in the LOAD position.
+         - NEMA + belt parent to base_link (motor side) and to
+           turntable_link (driven pulley) - both VISUAL only; the
+           cinematics is exclusively the table_rotation_joint.
+         - Pistons inside fixtures are FIXED (not prismatic) per spec.
+         - All debug CAFI / grasp / pick marker visuals were dropped
+           from the xacro copy so the planta does not show duplicates
+           against object_manager's dynamic CAFIs. -->
+  <xacro:turntable_rivet_cell parent="riveting_zone"
+                              xyz="0 0 0"
+                              rpy="0 0 0"/>
 
   <!-- ===== V41 Vision zone (DXF #46: 150x151 mm @ (381.5, 215.1)) =====
        V40 instantiated a workstation_table (15 mm grey plate, 150x151)
@@ -735,16 +718,12 @@
                             beam_yaw="1.5707963267948966"
                             mesa_z="1.000" beam_len="0.150"/>
 
-  <!-- V41: rivet/LOAD photoelectric MOVED to the opposite side.  V37-
-       V40 placed it WEST of the LOAD fixture (face_x=0.500, beam east);
-       the user flagged it as colliding with the cobot's south-west
-       approach to LOAD.  V41 mounts it EAST of LOAD (face_x=0.884,
-       beam yaw=pi -> west-pointing beam) so the cobot reach corridor
-       between (1.152, 1.049) and LOAD (0.692, 1.109) stays clear.    -->
-  <xacro:sick_photoelectric name="sensor_rotary_load_fixture" parent="world"
-                            face_x="0.884" face_y="1.109" face_z="1.110"
-                            beam_yaw="3.141592653589793"
-                            mesa_z="1.000" beam_len="0.150"/>
+  <!-- V52: sensor_rotary_load_fixture REMOVED.  The new turntable URDF
+       ships its own photoelectric sensor on a pedestal attached to
+       base_link (photoelectric_sensor_pedestal_fixture_1_link ->
+       photoelectric_sensor_fixture_1_link with a visible light ray).
+       It detects fixture 1 only and does NOT rotate with the disc. -->
+  <!-- (V41 sick_photoelectric "sensor_rotary_load_fixture" deleted in V52.) -->
 
   <!-- Sensor west of vision cradle at world (0.824, 0.804).  Beam
        yaw=0 (west-to-east).                                          -->
