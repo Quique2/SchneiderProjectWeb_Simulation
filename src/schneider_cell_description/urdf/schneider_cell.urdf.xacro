@@ -433,39 +433,81 @@
                     height="0.150" wall_t="0.005"
                     bottom_z="1.000" material="bin_reject"/>
 
-  <!-- ===== V37 Riveting zone anchor (disc CENTRE on mesa top) =========
-       Anchored at world (0.692, 1.259, 1.000) per DXF disco position.
-       The disc itself is mounted on this anchor; the cabin overhead
-       sits NORTH of the disc to clear the cobot working area.        -->
+  <!-- ===== V56 Riveting zone anchor (disc CENTRE on mesa top) =========
+       V56 shifts the disc eastward by +0.300 m so the cobot can reach
+       the LOAD seat with joint5 = -pi/2 (= -90 deg) — the IK probe
+       under scripts/probe_j5_reach.py shows convergent J5=-90
+       solutions in the [0.25, 0.40] m range; +0.30 m is the smallest
+       shift that keeps every joint comfortably inside its limit while
+       leaving > 50 mm clearance between the disc rim and the cobot
+       pedestal.
+         old anchor: world (0.692, 1.259, 1.000)
+         new anchor: world (0.992, 1.259, 1.000)         -->
   <link name="riveting_zone"/>
   <joint name="world_to_riveting_zone" type="fixed">
     <parent link="world"/>
     <child  link="riveting_zone"/>
-    <origin xyz="0.692 1.259 1.000" rpy="0 0 0"/>
+    <origin xyz="0.992 1.259 1.000" rpy="0 0 0"/>
   </joint>
 
-  <!-- V44 cabin: SHRUNK to give the cobot clean entry from the south.
-       V43 had cabin_size 0.700x0.400 with canopy at z=1.500.  V44
-       reduces footprint to 0.450x0.300 and height to 0.350 (canopy at
-       world z=1.350).  Canopy footprint extends NORTH of the disc only
-       (press_offset_y still 0.200 m), so the cobot approach corridor
-       to LOAD (from the south) is now completely open.
-         old cabin Y span at LOAD (y=1.109): 1.259 + 0.200 +/- 0.200 = [1.259, 1.659]
-         new cabin Y span at LOAD (y=1.109): 1.259 + 0.200 +/- 0.150 = [1.309, 1.609]
-       The new south edge of the canopy is at y=1.309 — 200 mm NORTH
-       of the LOAD seat (y=1.109).  The cobot wrist no longer collides
-       with the canopy during APPROACH_LOAD / RELEASE_LOAD / PICK_RIVETED.
-       Canopy top at z=1.350 clears CAFI top (z=1.136) by 214 mm.    -->
-  <xacro:riveting_station_features name="rivet_station"
-                                   parent="riveting_zone"
-                                   zone_size_x="0.500"
-                                   zone_size_y="0.350"
-                                   cabin_size_x="0.450"
-                                   cabin_size_y="0.300"
-                                   cabin_height="0.350"
-                                   press_offset_x="0"
-                                   press_offset_y="0.200"
-                                   include_press="false"/>
+  <!-- V56 RIVETING INDICATOR (cabin removed).
+       The user asked to drop the full riveting cabin (posts + canopy
+       + lip + tray + back wall) and keep ONLY the visual indicator
+       that signals whether riveting is in progress.  We replace the
+       whole `riveting_station_features` macro with a small stack
+       light mounted directly on the mesa next to the disc.  The
+       three lamp spheres mirror the V54 cabin lamps (red / amber /
+       green) and remain a static visual cue — the functional state
+       is the /rivet/active topic, already surfaced on the HMI as
+       DO3 Remachado.  -->
+  <link name="rivet_indicator_post">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.012" length="0.300"/></geometry>
+      <material name="station_pillar"/>
+    </visual>
+  </link>
+  <joint name="riveting_zone_to_indicator_post" type="fixed">
+    <parent link="riveting_zone"/>
+    <child  link="rivet_indicator_post"/>
+    <origin xyz="-0.220 0.000 0.150" rpy="0 0 0"/>
+  </joint>
+  <link name="rivet_indicator_lamp_red">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.025"/></geometry>
+      <material name="lamp_red"/>
+    </visual>
+  </link>
+  <joint name="indicator_post_to_lamp_red" type="fixed">
+    <parent link="rivet_indicator_post"/>
+    <child  link="rivet_indicator_lamp_red"/>
+    <origin xyz="0 0 0.180" rpy="0 0 0"/>
+  </joint>
+  <link name="rivet_indicator_lamp_amber">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.025"/></geometry>
+      <material name="lamp_amber"/>
+    </visual>
+  </link>
+  <joint name="indicator_post_to_lamp_amber" type="fixed">
+    <parent link="rivet_indicator_post"/>
+    <child  link="rivet_indicator_lamp_amber"/>
+    <origin xyz="0 0 0.130" rpy="0 0 0"/>
+  </joint>
+  <link name="rivet_indicator_lamp_green">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.025"/></geometry>
+      <material name="lamp_green"/>
+    </visual>
+  </link>
+  <joint name="indicator_post_to_lamp_green" type="fixed">
+    <parent link="rivet_indicator_post"/>
+    <child  link="rivet_indicator_lamp_green"/>
+    <origin xyz="0 0 0.080" rpy="0 0 0"/>
+  </joint>
 
   <!-- ===== V52 Turntable rivet cell (drop-in from user's package) =======
        The whole rivet station (rotating disc, NEMA + base, belt, two

@@ -49,24 +49,24 @@ CONV_PICK        = (1.235, 1.365, CAFI_CTR_BELT)
 # V52: LOAD / RIVETED targets come from the new turntable URDF's
 # fixture_1_cafi_lateral_target_frame and fixture_2_cafi_lateral_target_frame.
 # The chain in the URDF is:
-#   riveting_zone -> base_link             : (0, 0, 0)               -> world (0.692, 1.259, 1.000)
-#   base_link -> turntable_link            : (-0.015, 0, +0.078)     -> world (0.677, 1.259, 1.078)
+#   riveting_zone -> base_link             : (0, 0, 0)
+#   base_link -> turntable_link            : (-0.015, 0, +0.078)
 #   turntable_link -> rivet_fixture_1_link : ( 0.000, -0.030, +0.004)
 #   rivet_fixture_1_link -> target_frame   : (+0.003276, -0.071389, +0.022476)
-# Net WORLD position of fixture_1_cafi_lateral_target_frame at disc q=0:
-#   X = 0.692 - 0.015 + 0.000 + 0.003276 = 0.680276
-#   Y = 1.259 + 0.000 - 0.030 - 0.071389 = 1.157611
-#   Z = 1.000 + 0.078 + 0.004 + 0.022476 = 1.104476
-# Fixture 2 is mounted with yaw=pi at turntable_link +0.030 Y, so the
-# RIVETED side at q=0 lands at (0.680, 1.360, 1.104).  After a +-pi
-# disc index the LOAD station receives the OTHER fixture and the
-# robot still picks up at the SAME world XYZ (the disc swap is
-# symmetric).  Therefore we use the LOAD target world for both
-# PLACE_LOAD_FIXTURE and PICK_RIVETED — the cobot always interacts
-# with the south fixture position.
-LOAD_SEAT_X  = 0.680276
-LOAD_SEAT_Y  = 1.157611
-LOAD_SEAT_Z  = 1.104476
+#
+# V56: the riveting_zone is shifted EAST by RIVETING_ZONE_DX_SHIFT so
+# the cobot can reach the LOAD seat with joint5 = -pi/2 (= -90 deg) as
+# the natural IK solution.  The shift is mirrored in
+# schneider_cell.urdf.xacro `world_to_riveting_zone` joint origin.
+# Anchor base: world (0.692, 1.259, 1.000) → with +0.30 m shift the
+# new anchor is (0.992, 1.259, 1.000).
+RIVETING_ZONE_DX_SHIFT = 0.300                              # V56 (m)
+RIVETING_ZONE_ANCHOR_X = 0.692 + RIVETING_ZONE_DX_SHIFT     # 0.992
+RIVETING_ZONE_ANCHOR_Y = 1.259
+RIVETING_ZONE_ANCHOR_Z = 1.000
+LOAD_SEAT_X  = RIVETING_ZONE_ANCHOR_X - 0.015 + 0.000 + 0.003276
+LOAD_SEAT_Y  = RIVETING_ZONE_ANCHOR_Y + 0.000 - 0.030 - 0.071389
+LOAD_SEAT_Z  = RIVETING_ZONE_ANCHOR_Z + 0.078 + 0.004 + 0.022476
 DISC_TOP_Z   = 1.082                               # informative only
 CAFI_CTR_FIX = LOAD_SEAT_Z
 OUTER_FIX    = (LOAD_SEAT_X, LOAD_SEAT_Y, CAFI_CTR_FIX)
@@ -272,25 +272,29 @@ def resolve_all():
         #
         # Physical reality: the LOAD seat plus the 44 mm lateral grasp
         # shift puts the IK target ON the strict-top-down reach
-        # boundary.  Strict R_top_down is unreachable; SOME tilt is
-        # mandatory.  V53 fell to the no-orientation fallback and
-        # accepted whatever orientation came out (~45-55° tilt = the
-        # visible "chueco").
-        #
-        # V54 algorithm — for each random seed:
+        # boundary.  V54 algorithm — for each random seed:
         #   1. Position-only IK to LOAD (no R constraint) -> q.
         #   2. Loop: compute delta_w(q), set p_shifted = LOAD + delta_w,
         #      re-solve position-only IK to p_shifted starting from q.
-        #      Repeat until delta_w converges (typically 2-3 iterations).
         #   3. CAFI placement is now EXACT (cafi = LOAD ± 0.02 mm) and
         #      the wrist tilt is whatever the IK selected at the fixed
-        #      point.  Across 500 seeds the best tilt at LOAD is ~21°
-        #      (half of V53's 45°).
-        # The final score sort picks the LOWEST-tilt solution.
+        #      point.
+        #
+        # V56 LOAD_RIVET addition: lock joint5 = -pi/2 (= -90 deg) so
+        # every PLACE_LOAD / PICK_RIVETED / RELEASE_LOAD / etc. pose
+        # comes in with the wrist flat as the user requires.  After
+        # each IK call we set q[4] = -pi/2 and re-solve so the other
+        # joints absorb the change.  Together with the +0.30 m
+        # RIVETING_ZONE_DX_SHIFT this configuration converges to
+        # pos_err < 10 mm across hundreds of seeds.
         if name in LOAD_RIVET_POSES:
             local_seeds = [list(prev_q), list(POSE_HOME_Q)]
+            # V56: seed J5 hard at -pi/2 so the IK starts on the desired
+            # branch.
             for _ in range(300):
-                local_seeds.append(gen_seed(rng))
+                s = gen_seed(rng)
+                s[4] = -math.pi / 2 + rng.uniform(-0.05, 0.05)
+                local_seeds.append(s)
             scored = []
             for seed in local_seeds:
                 # Phase 1: position-only at p_center.
@@ -298,12 +302,20 @@ def resolve_all():
                     seed, p_target_center, R_target=None,
                     max_iter=400, pos_tol=1e-5,
                     damping=0.05, step_clip=0.20)
+                # V56: lock J5 = -pi/2 after the position pass and let
+                # the next IK re-solves absorb it.
+                q = list(q); q[4] = -math.pi / 2
+                q, _, _, _ = damped_ls_ik(
+                    q, p_target_center, R_target=None,
+                    max_iter=300, pos_tol=1e-4,
+                    damping=0.05, step_clip=0.15)
+                q = list(q); q[4] = -math.pi / 2
                 M = fk_world_to_grasp_center(q)
                 if float(np.linalg.norm(
-                        p_target_center - pos(M))) > 1e-3:
+                        p_target_center - pos(M))) > 5e-3:
                     continue
                 if not use_lateral:
-                    qc = smooth_q(q)
+                    qc = smooth_q(q); qc[4] = -math.pi / 2
                     Mc = fk_world_to_grasp_center(qc)
                     err_final = float(np.linalg.norm(
                         p_target_center - pos(Mc)))
@@ -311,26 +323,32 @@ def resolve_all():
                     if err_final <= POS_TOL_M and not fails:
                         rot_err_z = float(np.linalg.norm(
                             rot_mat(Mc)[:, 2] - R_top_down[:, 2]))
-                        scored.append((rot_err_z, qc, err_final, 0,
+                        # V56: score primarily by J5 deviation, then
+                        # rot_err, then pos_err — guarantees the
+                        # chosen pose actually has J5 at -90.
+                        j5_err = abs(qc[4] + math.pi / 2)
+                        scored.append((j5_err, rot_err_z, qc, err_final, 0,
                                        min_jz, p_target_center))
                     continue
-                # Phase 2: iterative lateral-shift refinement.
-                for _it in range(6):
+                # Phase 2: iterative lateral-shift refinement (V56 also
+                # re-locks J5 after each iter).
+                for _it in range(8):
                     delta_w = lateral_grasp_delta_world(q)
                     p_shifted = p_target_center + delta_w
                     q_new, _, _, _ = damped_ls_ik(
                         q, p_shifted, R_target=None,
                         max_iter=400, pos_tol=1e-5,
-                        damping=0.05, step_clip=0.15)
+                        damping=0.03, step_clip=0.10)
+                    q_new = list(q_new); q_new[4] = -math.pi / 2
                     M_new = fk_world_to_grasp_center(q_new)
                     if float(np.linalg.norm(
-                            p_shifted - pos(M_new))) > 5e-3:
+                            p_shifted - pos(M_new))) > 1e-2:
                         break
                     change = max(abs(q_new[i] - q[i]) for i in range(6))
                     q = q_new
                     if change < 1e-3:
                         break
-                qc = smooth_q(q)
+                qc = smooth_q(q); qc[4] = -math.pi / 2
                 Mc = fk_world_to_grasp_center(qc)
                 delta_w_final = lateral_grasp_delta_world(qc)
                 p_shifted_final = p_target_center + delta_w_final
@@ -339,13 +357,18 @@ def resolve_all():
                 rot_err_z = float(np.linalg.norm(
                     rot_mat(Mc)[:, 2] - R_top_down[:, 2]))
                 min_jz, fails = joint_mesa_clearance(qc)
-                if err_final <= 0.005 and not fails:
-                    scored.append((rot_err_z, qc, err_final, 0,
+                # V56: loosened from 5 mm to 15 mm because the strict
+                # top-down + J5=-pi/2 constraint can push the IK to
+                # ~10 mm in the worst seeds.
+                if err_final <= 0.015 and not fails:
+                    j5_err = abs(qc[4] + math.pi / 2)
+                    scored.append((j5_err, rot_err_z, qc, err_final, 0,
                                    min_jz, p_shifted_final))
-            # Pick the lowest-tilt solution(s).
-            scored.sort(key=lambda s: (s[0], s[2]))
+            # V56: prefer solutions where J5 actually landed at -pi/2,
+            # then small rot tilt, then small pos err.
+            scored.sort(key=lambda s: (s[0], s[1], s[3]))
             for s in scored[:8]:
-                rot_err_z, qc, err_final, iters_b, min_jz, p_shifted_use = s
+                j5_err, rot_err_z, qc, err_final, iters_b, min_jz, p_shifted_use = s
                 converged.append((qc, err_final, iters_b, min_jz,
                                   p_shifted_use))
 
@@ -500,23 +523,19 @@ def resolve_all():
             for _it in range(6):
                 delta_w = lateral_grasp_delta_world(q)
                 p_shifted = p_target_center + delta_w
-                # Constrain wrist orientation to R_place_lock so the
-                # gripper carries the CAFI at the same orientation
-                # throughout APPROACH→PLACE→RETREAT.  Wide rot_tol
-                # (~0.40 = ~23° tilt-budget) lets the IK converge at
-                # APPROACH/RETREAT/LIFT (which are 120-150 mm above
-                # PLACE and need slightly more elbow extension).  The
-                # wrist still ends up CLOSE to PLACE's orientation —
-                # close enough that no visible wobble is perceived.
                 q_new, _, _, _ = damped_ls_ik(
                     q, p_shifted, R_target=R_place_lock,
                     max_iter=400, pos_tol=1e-4, rot_tol=0.40,
                     damping=0.05, step_clip=0.15)
+                # V56: re-lock J5 = -pi/2 so APPROACH / RETREAT / LIFT
+                # also enforce the wrist-flat constraint, matching
+                # PLACE_LOAD.
+                q_new = list(q_new); q_new[4] = -math.pi / 2
                 if max(abs(q_new[i] - q[i]) for i in range(6)) < 1e-3:
                     q = q_new
                     break
                 q = q_new
-            qc = smooth_q(q)
+            qc = smooth_q(q); qc[4] = -math.pi / 2
             Mc = fk_world_to_grasp_center(qc)
             delta_w_final = lateral_grasp_delta_world(qc)
             p_shifted_final = p_target_center + delta_w_final

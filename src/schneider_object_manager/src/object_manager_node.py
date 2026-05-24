@@ -56,18 +56,19 @@ BELT_Y          = 1.365      # belt centre Y per DXF (LWPOLYLINE #47)
 SPAWN_X         = 1.620      # suministro east end
 PICK_X          = 1.235      # west pick (belt centre - 0.135 notch)
 
-# V52 disc layout from the new turntable_rivet_cell URDF.  base_link is
-# mounted at riveting_zone = world (0.692, 1.259, 1.000).  Internal
-# geometry from the URDF:
+# V52 disc layout from the new turntable_rivet_cell URDF.  V56 shifts
+# the whole riveting_zone EAST by +0.300 m so the cobot can reach the
+# LOAD seat with joint5 = -pi/2 (see scripts/resolve_poses.py header).
+# Anchor in world: (0.992, 1.259, 1.000).
+# Internal geometry from the URDF:
 #   base_link -> turntable_link  : (-0.015,  0.000, +0.078)
 #   turntable_link -> fixture_1  : ( 0.000, -0.030, +0.004)
 #   fixture_1 -> target_frame    : ( 0.003,  -0.071, +0.022)
-#   net target in world          : (0.680, 1.158, 1.104)
-# Fixture 2 is the 180-deg mirror at (0.674, 1.360, 1.104).
-# All these values are sourced from the URDF and NOT changed here; they
-# are only mirrored as Python constants for the gravity-fallback path
+#   net target in world          : (0.980, 1.158, 1.104)
+# Fixture 2 is the 180-deg mirror at (0.974, 1.360, 1.104).
+# These are mirrored as Python constants for the gravity-fallback path
 # that runs when TF lookups fail.
-DISC_CENTER_X   = 0.677       # average of fixture_1 and fixture_2 X
+DISC_CENTER_X   = 0.977       # V56: average of fixture_1 and fixture_2 X
 DISC_CENTER_Y   = 1.259
 DISC_TOP_Z      = 1.082       # disc top ~ riveting_zone z + 0.082
 MOUNT_RADIUS    = 0.101       # (fixture_2_y - fixture_1_y) / 2
