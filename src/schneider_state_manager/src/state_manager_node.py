@@ -1,6 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""schneider_state_manager.state_manager_node  --  V23 cell FSM
+"""schneider_state_manager.state_manager_node  --  V55 cell FSM
+
+V55 deltas vs V35 (V54 baseline):
+  * Operator HMI exposes START / STOP / RESET (V54 was START-via-spawn +
+    STOP/RESUME toggle).  V55 semantics:
+      - /operator/start (Empty): only path IDLE -> RUNNING.  /operator/
+        spawn_cafi in IDLE no longer auto-runs the cell.
+      - /operator/stop True still pauses; RESUME (toggle False) is
+        removed from the HMI surface — RESET is now the only way out
+        of PAUSED.
+      - /operator/reset (Empty): ONLY accepted in PAUSED.  Runs the
+        recovery sequence:
+          1. If gripper is CLOSED (with or without CAFI), the cobot
+             performs the REJECT bin place so it drops whatever it
+             is holding clear of the active stations.
+          2. CAFIs stranded at outer fixture and vision are removed
+             one by one (vision first, then outer).  If the inner
+             fixture still holds a CAFI the disc is indexed +180 so
+             it surfaces at outer and is removed last.
+          3. When the cleanup is empty the cell goes back to IDLE.
+             Operator must press START again to restart.
+  * Every delivery raises the rivet cabin (publishes /rivet/cabin_cmd
+    "RAISE") and lowers it after the cobot returns to HOME (collision
+    interlock requested for V55).
+  * The robot_controller is responsible for clamping joint 5 to
+    -pi/2 (== -90 deg) on every delivery release pose.
 
 V23 changes vs V22 (which was V20 untouched):
   - Adds the user-requested explicit "[SM] INDEX command +/-180 published"
@@ -118,6 +143,11 @@ STAGE_PICK_VISION   = "PICK_VISION"
 STAGE_PLACE_BIN     = "PLACE_BIN"
 STAGE_RETURN_HOME   = "RETURN_HOME"
 STAGE_STOPPED       = "STOPPED"
+# V55 reset substages while cell_state == PAUSED.  RESET_* runs the
+# recovery sequence; once it ends the FSM transitions back to IDLE.
+STAGE_RESET_PLACE_REJECT = "RESET_PLACE_REJECT"   # cobot dumping carried CAFI
+STAGE_RESET_CLEAN        = "RESET_CLEAN"          # removing stranded CAFIs
+STAGE_RESET_INDEX        = "RESET_INDEX"          # rotating disc to surface inner
 
 # Disco: angulo de indexado
 DISC_INDEX_RAD = 3.141592653589793  # 180 deg
@@ -138,6 +168,11 @@ WD_SEAT_S       = 6.0
 WD_INDEX_S      = 6.0
 WD_RIVET_S      = 40.0   # 30s rivet + 10s margen
 WD_INSPECT_S    = 6.0
+# V55 watchdogs for the reset substages.
+WD_RESET_REJECT_S = 25.0   # full TRAJ_PLACE_REJECT round trip
+WD_RESET_INDEX_S  = 8.0
+WD_RESET_TICK_S   = 1.0    # pace one CAFI removal per second
+WD_RESET_GLOBAL_S = 90.0   # whole reset budget
 
 
 # ============================================================
@@ -178,10 +213,24 @@ class StateManager(object):
 
         self.cafi_states           = []  # list[dict]
 
-        # V26: fixture-id station assignment, kept fresh by
-        # /disc/station_assignment.  Initial: A at LOAD, B at RIVET.
+        # V53: physical fixture id "A" / "B" (matches every existing
+        # consumer + the V52 KeyError-A fix).  URDF frame names use the
+        # "_1" / "_2" suffix; mapping happens in object_manager helpers.
         self.outer_id = "A"
         self.inner_id = "B"
+
+        # ---- V55 operator + gripper ----
+        # The cell is armed by /operator/start.  Until then nothing
+        # transitions to RUNNING even if /operator/spawn_cafi arrives.
+        self.started_once = False
+        # Mirror of /gripper/state (OPEN / CLOSED / MOVING) used by the
+        # reset handler to decide if it must dump a held CAFI first.
+        self.gripper_state_str = "OPEN"
+        # Pacing for one-by-one CAFI removal during reset cleanup.
+        self.reset_last_tick = 0.0
+        self.reset_t0 = 0.0
+        # Cabin state mirror to avoid spamming /rivet/cabin_cmd.
+        self.cabin_state = "LOWERED"
 
         # ---- Watchdog timestamp ----
         self.stage_t0 = rospy.Time.now().to_sec()
@@ -226,11 +275,35 @@ class StateManager(object):
         self.pub_fixture_unseat = rospy.Publisher(
             "/fixture/unseat_cmd",     String,  queue_size=1)
 
+        # V55 cabin lift + manual CAFI removal hooks.
+        # /rivet/cabin_cmd: "RAISE" / "LOWER".  State_manager echoes the
+        # transition immediately as /rivet/cabin_state (no separate sim
+        # node — the rivet cabin is a logical interlock in V55, not a
+        # URDF prismatic joint, so the state transition is instant).
+        # /objects/remove_cafi: cafi_id (decimal int) or location tag —
+        # used by the reset handler to simulate the operator removing
+        # CAFIs by hand.
+        self.pub_cabin_cmd      = rospy.Publisher(
+            "/rivet/cabin_cmd",        String,  queue_size=2, latch=True)
+        self.pub_cabin_state    = rospy.Publisher(
+            "/rivet/cabin_state",      String,  queue_size=2, latch=True)
+        self.pub_remove_cafi    = rospy.Publisher(
+            "/objects/remove_cafi",    String,  queue_size=4)
+
         # ---- Subscribers ----
         rospy.Subscriber("/operator/spawn_cafi",       Empty,
                          self._cb_op_spawn)
         rospy.Subscriber("/operator/stop",             Bool,
                          self._cb_op_stop)
+        # V55 operator buttons.
+        rospy.Subscriber("/operator/start",            Empty,
+                         self._cb_op_start)
+        rospy.Subscriber("/operator/reset",            Empty,
+                         self._cb_op_reset)
+        # V55 gripper state mirror (OPEN / CLOSED / MOVING) — the reset
+        # handler checks this to decide if it must dump a held CAFI.
+        rospy.Subscriber("/gripper/state",             String,
+                         self._cb_grip_state)
         rospy.Subscriber("/conveyor/part_present_pick", Bool,
                          self._cb_part_present)
         rospy.Subscriber("/conveyor/part_ready_for_pick", Bool,
@@ -269,21 +342,44 @@ class StateManager(object):
 
         # ---- Initial publish (latched) ----
         self._publish_state()
+        # V55: start with the cabin LOWERED (production rest position).
+        self.pub_cabin_cmd.publish(String(data="LOWER"))
+        self.pub_cabin_state.publish(String(data="LOWERED"))
 
-        rospy.loginfo("[SM] V35 state_manager init - cell=IDLE; "
-                      "PLACE_LOAD/PLACE_VISION use source-of-truth "
-                      "/objects/cafi_states as parallel gate (defense "
-                      "against derived-signal staleness)")
+        rospy.loginfo("[SM] V55 state_manager init - cell=IDLE; START is "
+                      "required (one-shot via /operator/start), RESET is "
+                      "the only PAUSED -> IDLE path, cabin RAISE/LOWER "
+                      "interlock wraps every delivery, joint5 = -90 on "
+                      "release pose (enforced in robot_controller).")
 
     # =========================================================
     # CALLBACKS
     # =========================================================
     def _cb_op_spawn(self, _m):
+        """V55: spawning a CAFI no longer arranca el ciclo automaticamente.
+        The cell only transitions IDLE -> RUNNING from /operator/start.
+        Conveyor_sim is the backend that rejects the spawn if the cell
+        is not RUNNING; this callback intentionally does nothing here
+        so the V54 deadlock cannot reappear via two coupled gates."""
+        pass
+
+    def _cb_op_start(self, _m):
+        """V55 START button.  Arms the cell exactly once."""
         with self.lock:
             if self.cell_state == CELL_IDLE:
+                self.started_once = True
+                rospy.loginfo("[SM] START del operador -> cell IDLE -> RUNNING")
                 self._transition_cell(CELL_RUNNING)
+                self._set_stage(STAGE_IDLE)
+            else:
+                rospy.logwarn("[SM] START IGNORED: cell=%s (solo se acepta "
+                              "en IDLE)", self.cell_state)
 
     def _cb_op_stop(self, msg):
+        """V55: STOP True pauses; the toggle-False RESUME path is no
+        longer accepted from the operator surface.  RESET is the only
+        way to exit PAUSED.  False messages are kept benign so legacy
+        callers do not throw."""
         with self.lock:
             if bool(msg.data):
                 rospy.logwarn("[SM] STOP del operador")
@@ -291,12 +387,55 @@ class StateManager(object):
                     self._transition_cell(CELL_PAUSED)
                     self._set_stage(STAGE_STOPPED)
             else:
-                rospy.loginfo("[SM] RESUME del operador")
-                if self.cell_state in (CELL_PAUSED, CELL_FAULT):
-                    self.fault_reason = ""
-                    self.pub_fault.publish(String(data=""))
-                    self._transition_cell(CELL_RUNNING)
-                    self._set_stage(STAGE_IDLE)
+                rospy.logdebug("[SM] /operator/stop=False ignored (V55 RESET "
+                               "is the only exit from PAUSED)")
+
+    def _cb_op_reset(self, _m):
+        """V55 RESET button.  Only valid in PAUSED (or FAULT — same
+        semantics: cleanup + back to IDLE)."""
+        with self.lock:
+            if self.cell_state not in (CELL_PAUSED, CELL_FAULT):
+                rospy.logwarn("[SM] RESET IGNORED: cell=%s (solo se acepta "
+                              "en PAUSED/FAULT)", self.cell_state)
+                return
+            rospy.loginfo("[SM] RESET del operador -> arrancando recovery "
+                          "(gripper=%s)", self.gripper_state_str)
+            self.reset_t0 = rospy.Time.now().to_sec()
+            self.reset_last_tick = self.reset_t0
+            # V55: always raise the cabin BEFORE the cobot moves.
+            self._cabin_raise()
+            if self.gripper_state_str == "CLOSED":
+                # Dump whatever the cobot is holding into the REJECT bin.
+                # The robot_controller will clamp J5 = -pi/2 and the
+                # cabin is already raised so the wrist clears the canopy.
+                rospy.loginfo("[SM] RESET: gripper CLOSED -> commanding "
+                              "TRAJ_PLACE_REJECT (dump and clear)")
+                self._set_stage(STAGE_RESET_PLACE_REJECT)
+                self.pub_req_place_reject.publish(Empty())
+            else:
+                rospy.loginfo("[SM] RESET: gripper OPEN -> skip dump, go "
+                              "straight to CLEAN substage")
+                self._set_stage(STAGE_RESET_CLEAN)
+
+    def _cb_grip_state(self, m):
+        self.gripper_state_str = m.data
+
+    # =========================================================
+    # V55 CABIN INTERLOCK
+    # =========================================================
+    def _cabin_raise(self):
+        if self.cabin_state != "RAISED":
+            rospy.loginfo("[SM] cabin RAISE (was %s)", self.cabin_state)
+            self.pub_cabin_cmd.publish(String(data="RAISE"))
+            self.cabin_state = "RAISED"
+            self.pub_cabin_state.publish(String(data="RAISED"))
+
+    def _cabin_lower(self):
+        if self.cabin_state != "LOWERED":
+            rospy.loginfo("[SM] cabin LOWER (was %s)", self.cabin_state)
+            self.pub_cabin_cmd.publish(String(data="LOWER"))
+            self.cabin_state = "LOWERED"
+            self.pub_cabin_state.publish(String(data="LOWERED"))
 
     def _cb_part_present(self, m):    self.part_present_pick = bool(m.data)
     def _cb_part_ready(self, m):      self.part_ready_for_pick = bool(m.data)
@@ -409,10 +548,101 @@ class StateManager(object):
         return None
 
     # =========================================================
+    # V55 RESET SEQUENCE (runs while cell_state == PAUSED)
+    # =========================================================
+    def _tick_reset(self):
+        """Drive the reset substages.  Returns True if the sequence
+        has finished and the cell should transition back to IDLE."""
+        now = rospy.Time.now().to_sec()
+        if now - self.reset_t0 > WD_RESET_GLOBAL_S:
+            rospy.logerr("[SM] RESET global watchdog FIRED at %.1fs; "
+                         "aborting cleanup, dropping back to IDLE.",
+                         now - self.reset_t0)
+            return True
+
+        if self.cycle_stage == STAGE_RESET_PLACE_REJECT:
+            if self._stage_elapsed() > WD_RESET_REJECT_S:
+                rospy.logerr("[SM] RESET reject watchdog FIRED at %.1fs; "
+                             "advancing to CLEAN.",
+                             self._stage_elapsed())
+                self._set_stage(STAGE_RESET_CLEAN)
+                return False
+            if self.robot_motion_done and not self.gripper_grasp:
+                rospy.loginfo("[SM] RESET reject ok -> CLEAN substage")
+                self._set_stage(STAGE_RESET_CLEAN)
+            return False
+
+        if self.cycle_stage == STAGE_RESET_INDEX:
+            if self._stage_elapsed() > WD_RESET_INDEX_S:
+                rospy.logerr("[SM] RESET index watchdog FIRED at %.1fs; "
+                             "advancing to CLEAN.",
+                             self._stage_elapsed())
+                self._set_stage(STAGE_RESET_CLEAN)
+                return False
+            if self.disc_index_done_flag:
+                rospy.loginfo("[SM] RESET disc index done -> CLEAN substage")
+                self._set_stage(STAGE_RESET_CLEAN)
+            return False
+
+        # Default substage: STAGE_RESET_CLEAN — remove one stranded
+        # CAFI per tick (1s pace per WD_RESET_TICK_S) in priority order:
+        #   1. CAFI at vision   (operator clears it first)
+        #   2. CAFI at outer fixture
+        #   3. If only the inner fixture still has a CAFI, index +180
+        #      so it surfaces at outer and is removed last.
+        if (now - self.reset_last_tick) < WD_RESET_TICK_S:
+            return False
+        self.reset_last_tick = now
+
+        vis = self._vision_cafi()
+        outer = self._outer_cafi()
+        inner = self._inner_cafi()
+        if vis is not None:
+            cid = vis.get("id")
+            rospy.loginfo("[SM] RESET: removing vision CAFI id=%s", cid)
+            self.pub_remove_cafi.publish(String(data=str(cid)))
+            return False
+        if outer is not None:
+            cid = outer.get("id")
+            rospy.loginfo("[SM] RESET: removing outer-fixture CAFI id=%s",
+                          cid)
+            self.pub_remove_cafi.publish(String(data=str(cid)))
+            return False
+        if inner is not None:
+            # Rotate the disc so the inner CAFI surfaces at outer; then
+            # the next reset tick will remove it via the outer branch.
+            rospy.loginfo("[SM] RESET: only inner CAFI remains (id=%s) -> "
+                          "INDEX +180 so it becomes accessible at outer",
+                          inner.get("id"))
+            self._set_stage(STAGE_RESET_INDEX)
+            self.pub_disc_index.publish(Float32(data=+DISC_INDEX_RAD))
+            return False
+
+        # Nothing left to clean -> done.
+        rospy.loginfo("[SM] RESET cleanup complete -> back to IDLE; "
+                      "press START to restart")
+        return True
+
+    # =========================================================
     # FSM TICK
     # =========================================================
     def tick(self):
         with self.lock:
+            # V55 reset runs while paused.
+            if self.cell_state in (CELL_PAUSED, CELL_FAULT):
+                if self.cycle_stage in (STAGE_RESET_PLACE_REJECT,
+                                         STAGE_RESET_INDEX,
+                                         STAGE_RESET_CLEAN):
+                    done = self._tick_reset()
+                    if done:
+                        self.fault_reason = ""
+                        self.pub_fault.publish(String(data=""))
+                        self._set_stage(STAGE_IDLE)
+                        self._transition_cell(CELL_IDLE)
+                        self.started_once = False  # require START again
+                        self._cabin_lower()
+                return
+
             if self.cell_state != CELL_RUNNING:
                 return
 
@@ -539,6 +769,7 @@ class StateManager(object):
                 if self.robot_motion_done and self.gripper_grasp:
                     rospy.loginfo("[SM] PICK_CONV complete -> PLACE_LOAD "
                                   "(motion_done=True grasp_confirmed=True)")
+                    self._cabin_raise()   # V55 interlock
                     self._set_stage(STAGE_PLACE_LOAD)
                     self.pub_req_place_load.publish(String(data="outer"))
                 return
@@ -586,6 +817,7 @@ class StateManager(object):
                         self.fixture_load_present,
                         (outer_cafi_now.get("id")
                          if outer_cafi_now else None))
+                    self._cabin_lower()   # V55: delivery done, cabin safe
                     self._set_stage(STAGE_SEAT)
                     self.pub_fixture_seat.publish(String(data="outer"))
                 return
@@ -669,6 +901,7 @@ class StateManager(object):
                     return
                 if self.robot_motion_done and self.gripper_grasp:
                     rospy.loginfo("[SM] pick riveted ok -> PLACE_VISION")
+                    self._cabin_raise()   # V55 interlock
                     self._set_stage(STAGE_PLACE_VISION)
                     self.pub_req_place_vision.publish(Empty())
                 return
@@ -702,6 +935,7 @@ class StateManager(object):
                         self.vision_presence,
                         (at_vis_now.get("id")
                          if at_vis_now else None))
+                    self._cabin_lower()   # V55: delivery done, cabin safe
                     self._set_stage(STAGE_INSPECT)
                     self.pub_camera_trig.publish(Empty())
                 return
@@ -746,6 +980,7 @@ class StateManager(object):
                         verdict = self.camera_result
                     rospy.loginfo("[SM] PICK_VISION complete -> PLACE_BIN "
                                   "(verdict=%s)", verdict)
+                    self._cabin_raise()   # V55 interlock for bin drop
                     self._set_stage(STAGE_PLACE_BIN)
                     if verdict == "PASS":
                         self.pub_req_place_accept.publish(Empty())
@@ -760,6 +995,7 @@ class StateManager(object):
                     return
                 if self.robot_motion_done and not self.gripper_grasp:
                     rospy.loginfo("[SM] place bin ok -> IDLE")
+                    self._cabin_lower()   # V55: delivery done, cabin safe
                     # V28: reset camera verdict so the IDLE dispatcher
                     # does not loop into PICK_VISION again.  The CAFI is
                     # in the bin; the cycle is done.
@@ -770,6 +1006,8 @@ class StateManager(object):
             # --------- RETURN_HOME ---------
             if stage == STAGE_RETURN_HOME:
                 if self.robot_motion_done:
+                    # V55: drop the cabin once the cobot is clear (HOME).
+                    self._cabin_lower()
                     self._set_stage(STAGE_IDLE)
                 return
 

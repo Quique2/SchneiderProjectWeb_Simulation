@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""schneider_robot_controller.robot_controller_node  --  V23
+"""schneider_robot_controller.robot_controller_node  --  V55
+
+V55 deltas vs V25 (V54 baseline):
+  * Joint 5 is hard-clamped to -pi/2 (= -90 deg) on every delivery
+    release step (every POSE_RELEASE_* / POSE_DROP_*).  The
+    resolve_poses IK already lands J5 within ~5 deg of -pi/2 for
+    those poses, so the clamp moves the TCP by <= 5 mm — well inside
+    the V51 PICK lateral tolerance — while guaranteeing the wrist
+    enters the bin/seat in the canonical orientation the user wants.
+  * The clamp is applied at segment-start so the interpolation runs
+    on the clamped joint vector and the visible motion stays smooth.
+
+V23 baseline doc below
+======================
 
 V20-V22 used hand-tuned joint poses. V22 admitted in its own resumen that
 those poses were "not IK-validated" and that the gripper TCP did not end
@@ -195,6 +208,29 @@ def clamp_joints(q):
             for i in range(6)]
 
 
+# V55: every step in this set must release with the wrist (joint 5) at
+# exactly -pi/2 rad (= -90 deg).  The user requires this on all CAFI
+# deliveries — load fixture, vision fixture and both bins — so the
+# wrist comes in flat to the seat regardless of the IK-resolved value.
+J5_CLAMP_MINUS_90_STEPS = {
+    "POSE_RELEASE_LOAD_FIXTURE",
+    "POSE_RELEASE_VISION",
+    "POSE_DROP_ACCEPT_BIN",
+    "POSE_DROP_REJECT_BIN",
+}
+J5_TARGET_MINUS_90 = -math.pi / 2.0  # -1.570796 rad
+
+
+def maybe_clamp_j5(step_name, q):
+    """V55: if step_name is a delivery release/drop, overwrite q[4] with
+    -pi/2.  No-op for every other step."""
+    if step_name in J5_CLAMP_MINUS_90_STEPS:
+        out = list(q)
+        out[4] = J5_TARGET_MINUS_90
+        return out
+    return q
+
+
 def shortest_path_target(q_current, q_target):
     """V35: Re-wrap each joint target to the 2*pi-equivalent angle
     closest to q_current, clamped to the joint limits.  Eliminates
@@ -386,11 +422,16 @@ class RobotController(object):
             rospy.logerr("[CTRL] unknown step %s -> skip", step)
             self._start_next_step()
             return
+        # V55: clamp J5 = -pi/2 on every delivery release/drop step.
+        base_target = maybe_clamp_j5(step, POSE_LIB[step])
+        if base_target is not POSE_LIB[step]:
+            rospy.loginfo("[CTRL] V55 clamp J5 = -pi/2 on %s "
+                          "(was %.4f rad)", step, POSE_LIB[step][4])
         # V35: pick the 2*pi-equivalent target closest to q_current so
         # joints with wide limits do not take the long way round.  See
         # shortest_path_target() docstring.
         target = shortest_path_target(self.q_current,
-                                      clamp_joints(POSE_LIB[step]))
+                                      clamp_joints(base_target))
         self.q_start  = list(self.q_current)
         self.q_target = list(target)
         self.seg_t0   = rospy.Time.now().to_sec()

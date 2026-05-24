@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""schneider_hmi.hmi_node  --  V25
+"""schneider_hmi.hmi_node  --  V55
 
-Two-button operator HMI + monitoring panel.
+Four-button operator HMI + monitoring panel.
 
-OPERATOR BUTTONS:
+V55 OPERATOR BUTTONS:
+  - "START"          -> /operator/start (Empty)
+                        ENABLED only when cell == IDLE.  V55 the cell
+                        no longer arranca automaticamente al spawn; el
+                        operador debe pulsar START la primera vez.
   - "Colocar CAFI"   -> /operator/spawn_cafi (Empty)
-                        DESHABILITADO si /conveyor/spawn_allowed=False
-  - "STOP / RESUME"  -> /operator/stop (Bool toggle)
+                        ENABLED only when cell == RUNNING and
+                        /conveyor/spawn_allowed == True (also gates
+                        first-CAFI when one is already on the belt).
+  - "STOP"           -> /operator/stop (Bool True)
+                        ENABLED only when cell == RUNNING.
+  - "RESET"          -> /operator/reset (Empty)
+                        ENABLED only when cell == PAUSED/FAULT.
+                        Runs the recovery sequence and returns to IDLE.
 
 MONITOR (read-only):
   DI lamps (4):
@@ -82,12 +92,19 @@ class HMI(object):
         self.do_sol_l        = False
         self.do_sol_r        = False
         self.stopped         = False
+        # V55 cabin state mirror.
+        self.cabin_state     = "LOWERED"
 
         # Publishers
         self.pub_spawn = rospy.Publisher(
             "/operator/spawn_cafi", Empty, queue_size=2)
         self.pub_stop  = rospy.Publisher(
             "/operator/stop",       Bool,  queue_size=2)
+        # V55 new operator commands.
+        self.pub_start = rospy.Publisher(
+            "/operator/start",      Empty, queue_size=2)
+        self.pub_reset = rospy.Publisher(
+            "/operator/reset",      Empty, queue_size=2)
 
         # Subscribers
         rospy.Subscriber("/conveyor/spawn_allowed",  Bool,
@@ -118,6 +135,9 @@ class HMI(object):
                          self._cb_grip_state)
         rospy.Subscriber("/fixture/solenoids_state", UInt8MultiArray,
                          self._cb_sol_state)
+        # V55 cabin mirror.
+        rospy.Subscriber("/rivet/cabin_state",       String,
+                         self._cb_cabin_state)
 
     def _cb_spawn_allowed(self, m): self.spawn_allowed = bool(m.data)
     def _cb_cell_state(self, m):    self.cell_state = m.data
@@ -142,40 +162,63 @@ class HMI(object):
             self.do_sol_l = bool(m.data[0] or m.data[2])
             self.do_sol_r = bool(m.data[1] or m.data[3])
 
+    def _cb_cabin_state(self, m):
+        self.cabin_state = m.data
+
     # =========================================================
     # Operator actions
     # =========================================================
-    def on_spawn(self):
-        """V21: el HMI NO censura el primer spawn cuando la celda esta
-        en IDLE. Razon: spawn_allowed depende de conveyor_sim, conveyor_sim
-        solo lo pone True con cell=RUNNING, y state_manager solo pasa a
-        RUNNING al recibir /operator/spawn_cafi -> deadlock de arranque.
+    def on_start(self):
+        """V55 START button.  Only arms when cell == IDLE.  After the
+        first press the state_manager transitions IDLE -> RUNNING and
+        the button stays disabled for the rest of the session."""
+        if self.cell_state != "IDLE":
+            rospy.logwarn("[HMI] START IGNORED: cell %s (solo IDLE)",
+                          self.cell_state)
+            return
+        self.pub_start.publish(Empty())
+        rospy.loginfo("[HMI] operator: START (cell=IDLE -> RUNNING)")
 
-        Regla V21:
-          cell=IDLE                                 -> publica (arranca el ciclo)
-          cell=RUNNING + spawn_allowed=True         -> publica
-          cell=RUNNING + spawn_allowed=False        -> bloquea (gating runtime)
-          cell in {PAUSED, FAULT}                   -> bloquea
-        El backend (conveyor_sim._spawn_can_proceed) tiene la palabra final.
-        """
-        if self.cell_state in ("PAUSED", "FAULT"):
-            rospy.logwarn("[HMI] spawn IGNORED: cell %s", self.cell_state)
+    def on_spawn(self):
+        """V55: spawn solo cuando cell == RUNNING y spawn_allowed.
+        El gating de la primera CAFI tras START lo hace conveyor_sim
+        (`_spawn_can_proceed`), que rechaza el spawn si ya hay CAFI en
+        spawn zone, en el sensor de pick o si hay acumulacion."""
+        if self.cell_state != "RUNNING":
+            rospy.logwarn("[HMI] spawn IGNORED: cell %s (necesita RUNNING)",
+                          self.cell_state)
             return
-        if self.cell_state == "RUNNING" and not self.spawn_allowed:
+        if not self.spawn_allowed:
             rospy.logwarn("[HMI] spawn IGNORED: spawn_allowed=False "
-                          "(runtime gating)")
+                          "(runtime gating: cafi already on belt/sensor)")
             return
-        # cell=IDLE -> arranca; cell=RUNNING + allowed -> spawn normal
         self.pub_spawn.publish(Empty())
         rospy.loginfo("[HMI] operator: Colocar CAFI (cell=%s)",
                       self.cell_state)
 
-    def on_stop_toggle(self):
+    def on_stop(self):
+        """V55 STOP button: only valid when cell == RUNNING.  No RESUME
+        toggle anymore — RESET is the only way out of PAUSED."""
+        if self.cell_state != "RUNNING":
+            rospy.logwarn("[HMI] STOP IGNORED: cell %s (solo RUNNING)",
+                          self.cell_state)
+            return
         with self.lock:
-            self.stopped = not self.stopped
-        self.pub_stop.publish(Bool(data=self.stopped))
-        rospy.loginfo("[HMI] operator: %s",
-                      "STOP" if self.stopped else "RESUME")
+            self.stopped = True
+        self.pub_stop.publish(Bool(data=True))
+        rospy.loginfo("[HMI] operator: STOP")
+
+    def on_reset(self):
+        """V55 RESET button: only valid when cell == PAUSED / FAULT.
+        Triggers the state_manager recovery sequence."""
+        if self.cell_state not in ("PAUSED", "FAULT"):
+            rospy.logwarn("[HMI] RESET IGNORED: cell %s "
+                          "(solo PAUSED/FAULT)", self.cell_state)
+            return
+        with self.lock:
+            self.stopped = False
+        self.pub_reset.publish(Empty())
+        rospy.loginfo("[HMI] operator: RESET")
 
     # =========================================================
     # GUI
@@ -187,30 +230,42 @@ class HMI(object):
             return
 
         root = tk.Tk()
-        root.title("Schneider Cell V25 - HMI")
-        root.geometry("700x600")
+        root.title("Schneider Cell V55 - HMI")
+        root.geometry("820x680")
 
         # Header
         hdr = ttk.Frame(root, padding=10)
         hdr.pack(fill="x")
-        ttk.Label(hdr, text="Schneider Riveting Cell - HMI V25",
+        ttk.Label(hdr, text="Schneider Riveting Cell - HMI V55",
                   font=("Helvetica", 16, "bold")).pack()
 
-        # Operator buttons
+        # Operator buttons (V55: START / Colocar CAFI / STOP / RESET)
         btn_frame = ttk.Frame(root, padding=10)
         btn_frame.pack(fill="x")
+        self.btn_start = tk.Button(
+            btn_frame, text="START",
+            command=self.on_start, width=14, height=2,
+            bg="#22aa55", fg="white",
+            font=("Helvetica", 12, "bold"))
+        self.btn_start.pack(side="left", padx=6)
         self.btn_spawn = tk.Button(
             btn_frame, text="Colocar CAFI",
-            command=self.on_spawn, width=20, height=2,
+            command=self.on_spawn, width=16, height=2,
             bg="#3399ff", fg="white",
             font=("Helvetica", 12, "bold"))
-        self.btn_spawn.pack(side="left", padx=10)
+        self.btn_spawn.pack(side="left", padx=6)
         self.btn_stop = tk.Button(
-            btn_frame, text="STOP / RESUME",
-            command=self.on_stop_toggle, width=20, height=2,
+            btn_frame, text="STOP",
+            command=self.on_stop, width=14, height=2,
             bg="#dd5500", fg="white",
             font=("Helvetica", 12, "bold"))
-        self.btn_stop.pack(side="left", padx=10)
+        self.btn_stop.pack(side="left", padx=6)
+        self.btn_reset = tk.Button(
+            btn_frame, text="RESET",
+            command=self.on_reset, width=14, height=2,
+            bg="#a23bff", fg="white",
+            font=("Helvetica", 12, "bold"))
+        self.btn_reset.pack(side="left", padx=6)
 
         # Cell state
         st_frame = ttk.LabelFrame(root, text="Cell State", padding=10)
@@ -235,6 +290,12 @@ class HMI(object):
                                   font=("Helvetica", 10, "bold"),
                                   width=20)
         self.lbl_spawn.pack(side="left", padx=5)
+        # V55 cabin status indicator (RAISED / RAISING / LOWERED / LOWERING).
+        self.lbl_cabin = tk.Label(sf_frame, text="CABIN LOWERED",
+                                  bg=COLOR_OFF, fg="white",
+                                  font=("Helvetica", 10, "bold"),
+                                  width=18)
+        self.lbl_cabin.pack(side="left", padx=5)
         self.lbl_fault = tk.Label(sf_frame, text="", fg="red",
                                   font=("Helvetica", 10, "bold"))
         self.lbl_fault.pack(side="left", padx=10)
@@ -274,23 +335,44 @@ class HMI(object):
             self.do_lamps[n] = lamp
 
         def refresh():
-            # V21: en IDLE el boton DEBE estar habilitado para arrancar
-            # el ciclo (rompe el deadlock de arranque). Solo se deshabilita
-            # cuando cell=RUNNING + spawn_allowed=False (gating de runtime)
-            # o cuando cell in {PAUSED, FAULT}.
-            enable_first = (self.cell_state == "IDLE")
-            enable_run   = (self.cell_state == "RUNNING" and self.spawn_allowed)
-            if enable_first or enable_run:
+            # V55 enablement matrix.
+            #   START : IDLE
+            #   spawn : RUNNING + spawn_allowed
+            #   STOP  : RUNNING
+            #   RESET : PAUSED / FAULT
+            if self.cell_state == "IDLE":
+                self.btn_start.config(state="normal", bg="#22aa55")
+            else:
+                self.btn_start.config(state="disabled", bg="#888888")
+
+            enable_run = (self.cell_state == "RUNNING" and self.spawn_allowed)
+            if enable_run:
                 self.btn_spawn.config(state="normal", bg="#3399ff")
-                label = "SPAWN ALLOWED" if enable_run else "ARRANCAR CICLO"
-                self.lbl_spawn.config(text=label, bg=COLOR_ON)
+                self.lbl_spawn.config(text="SPAWN ALLOWED", bg=COLOR_ON)
             else:
                 self.btn_spawn.config(state="disabled", bg="#888888")
                 self.lbl_spawn.config(text="SPAWN BLOCKED",
                                       bg=COLOR_WARN)
-            self.btn_stop.config(
-                text="RESUME" if self.stopped else "STOP",
-                bg="#22aa55" if self.stopped else "#dd5500")
+
+            if self.cell_state == "RUNNING":
+                self.btn_stop.config(state="normal", bg="#dd5500")
+            else:
+                self.btn_stop.config(state="disabled", bg="#888888")
+
+            if self.cell_state in ("PAUSED", "FAULT"):
+                self.btn_reset.config(state="normal", bg="#a23bff")
+            else:
+                self.btn_reset.config(state="disabled", bg="#888888")
+
+            # V55 cabin status colour.
+            cabin = self.cabin_state
+            cabin_lbl = "CABIN " + cabin
+            if cabin == "RAISED":
+                self.lbl_cabin.config(text=cabin_lbl, bg=COLOR_ON)
+            elif cabin in ("RAISING", "LOWERING"):
+                self.lbl_cabin.config(text=cabin_lbl, bg="#cc9900")
+            else:
+                self.lbl_cabin.config(text=cabin_lbl, bg=COLOR_OFF)
             # cell / stage / verdict
             self.lbl_cell.config(text=self.cell_state,
                                  fg=("red" if self.cell_state == "FAULT"

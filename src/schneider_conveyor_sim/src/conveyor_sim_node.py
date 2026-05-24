@@ -209,11 +209,13 @@ class ConveyorSimNode(object):
         """Return (ok, reason). Backend-side enforcement: aunque el HMI
         publique al topic, este nodo decide si el object_manager spawnea.
 
-        V21: permitido en IDLE o RUNNING. El primer spawn del operador
-        arranca el ciclo (state_manager transiciona IDLE->RUNNING en
-        _cb_op_spawn). V20 solo permitia RUNNING -> deadlock de arranque."""
-        if self.cell_state not in ("IDLE", CELL_RUNNING):
-            return False, "cell in {} (need IDLE or RUNNING)".format(
+        V55: el spawn solo se acepta cuando cell == RUNNING.  IDLE ya
+        no autoarranca el ciclo (eso lo hace /operator/start desde el
+        HMI); un spawn en IDLE seria un click previo a START y debe
+        rechazarse para no dejar una CAFI parada en el conveyor antes
+        de que el dispatcher pueda recogerla."""
+        if self.cell_state != CELL_RUNNING:
+            return False, "cell in {} (need RUNNING; press START first)".format(
                 self.cell_state)
         # V29 relaxed: only short blocking stages stop spawn.  The
         # disc indexing takes ~2.6 s so we keep it blocked.  RIVETING

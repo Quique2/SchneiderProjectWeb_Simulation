@@ -56,15 +56,23 @@ BELT_Y          = 1.365      # belt centre Y per DXF (LWPOLYLINE #47)
 SPAWN_X         = 1.620      # suministro east end
 PICK_X          = 1.235      # west pick (belt centre - 0.135 notch)
 
-# V39 disc layout (DXF #41 + r=200 circle centred at (0.692, 1.259)).
-# LOAD mount is on the SOUTH (cobot side) at y=1.109; RIVET on NORTH at
-# y=1.409.  The rotary_index_table_v37 macro defines MOUNT_RADIUS=0.150.
-DISC_CENTER_X   = 0.692
+# V52 disc layout from the new turntable_rivet_cell URDF.  base_link is
+# mounted at riveting_zone = world (0.692, 1.259, 1.000).  Internal
+# geometry from the URDF:
+#   base_link -> turntable_link  : (-0.015,  0.000, +0.078)
+#   turntable_link -> fixture_1  : ( 0.000, -0.030, +0.004)
+#   fixture_1 -> target_frame    : ( 0.003,  -0.071, +0.022)
+#   net target in world          : (0.680, 1.158, 1.104)
+# Fixture 2 is the 180-deg mirror at (0.674, 1.360, 1.104).
+# All these values are sourced from the URDF and NOT changed here; they
+# are only mirrored as Python constants for the gravity-fallback path
+# that runs when TF lookups fail.
+DISC_CENTER_X   = 0.677       # average of fixture_1 and fixture_2 X
 DISC_CENTER_Y   = 1.259
-DISC_TOP_Z      = 1.081      # mesa top + 0.081 (disco_1 STL top face)
-MOUNT_RADIUS    = 0.150
-FIXTURE_TOP_Z   = DISC_TOP_Z + 0.030     # 1.111  cradle top
-CAFI_REST_Z     = FIXTURE_TOP_Z + 0.012  # 1.123  CAFI centre on cradle
+DISC_TOP_Z      = 1.082       # disc top ~ riveting_zone z + 0.082
+MOUNT_RADIUS    = 0.101       # (fixture_2_y - fixture_1_y) / 2
+FIXTURE_TOP_Z   = 1.082       # fixture cradle top (cafi target z)
+CAFI_REST_Z     = 1.104       # fixture_X_cafi_lateral_target_frame world z
 
 # V44 vision fixture moved 74 mm WEST (DXF + cobot clearance).
 VISION_X        = 0.750
@@ -111,6 +119,31 @@ import math as _m
 _q_yup_to_zup = (-_m.sin(_m.pi / 4), 0.0, 0.0, _m.cos(_m.pi / 4))
 
 CAFI_MESH = "package://schneider_cell_description/meshes/cafi/cafi.STL"
+
+# V53: physical fixture id "A" / "B" is the canonical convention every
+# consumer is wired for.  The turntable URDF exposes its fixtures with
+# the "_1" / "_2" suffix on every frame name, so we map "A" -> "1" and
+# "B" -> "2" at the single point where TF frame names are looked up
+# (and nowhere else).  This keeps the V52 KeyError 'A' bug impossible:
+# the dict keys stay "A" / "B" everywhere, the mapping is one helper.
+_FIX_ID_TO_URDF = {
+    "A": "1", "B": "2",
+    # legacy: any code still emitting "1" / "2" maps cleanly too.
+    "1": "1", "2": "2",
+}
+
+
+def _fixture_target_frame(fid):
+    """Return the new turntable's CAFI-target TF frame for fixture id."""
+    return ("fixture_" +
+            _FIX_ID_TO_URDF.get(fid or "A", "1") +
+            "_cafi_lateral_target_frame")
+
+
+def _fixture_pick_frame(fid):
+    """Return the new turntable's CAFI-pick TF frame for fixture id."""
+    return "cafi_pick_frame_" + _FIX_ID_TO_URDF.get(fid or "A", "1")
+
 
 GRAVITY = 9.81
 SETTLE_VZ_THRESHOLD = 0.05
@@ -164,6 +197,34 @@ def q_rotate_vec(q, v):
     qv = (v[0], v[1], v[2], 0.0)
     r = q_mul(q_mul(q, qv), q_conj(q))
     return (r[0], r[1], r[2])
+
+
+def q_slerp(q0, q1, t):
+    """V54: Spherical linear interpolation between quaternions q0..q1.
+
+    t in [0, 1].  Used by the smooth-settle path in tick() to rotate
+    the CAFI from its in-gripper orientation to the URDF frame
+    orientation progressively during the gravity fall — no abrupt snap.
+    """
+    t = max(0.0, min(1.0, float(t)))
+    ax, ay, az, aw = q_normalize(q0)
+    bx, by, bz, bw = q_normalize(q1)
+    dot = ax*bx + ay*by + az*bz + aw*bw
+    if dot < 0.0:
+        bx, by, bz, bw = -bx, -by, -bz, -bw
+        dot = -dot
+    if dot > 0.9995:
+        # Nearly identical -> linear blend
+        out = (ax + t*(bx-ax), ay + t*(by-ay),
+               az + t*(bz-az), aw + t*(bw-aw))
+        return q_normalize(out)
+    theta_0 = math.acos(max(-1.0, min(1.0, dot)))
+    sin_t0 = math.sin(theta_0)
+    theta = theta_0 * t
+    s0 = math.cos(theta) - dot * math.sin(theta) / sin_t0
+    s1 = math.sin(theta) / sin_t0
+    return q_normalize((s0*ax + s1*bx, s0*ay + s1*by,
+                        s0*az + s1*bz, s0*aw + s1*bw))
 
 
 def pose_compose(p_a, q_a, p_b, q_b):
@@ -223,6 +284,17 @@ class Cafi(object):
         # means "not yet settled".
         self.t_seat_cafi_p = None
         self.t_seat_cafi_q = None
+        # V54 smooth-settle: snapshot of pose AT THE INSTANT OF DETACH,
+        # used to slerp orientation + lerp XY toward the URDF frame as
+        # the CAFI falls under gravity.  Replaces V53's abrupt
+        # orientation snap at the moment of cradle contact (which was
+        # the "magic snap" the user rejected).
+        self.settle_start_z = None
+        self.settle_target_z = None
+        self.settle_start_q = None
+        self.settle_start_xy = None
+        self.settle_target_xy = None
+        self.settle_target_q = None
         # V28: target seat frame for the settling state machine.
         # When location starts with 'settling_', the CAFI falls under
         # gravity until its bottom reaches the seat top (or the seat
@@ -284,6 +356,12 @@ class ObjectManager(object):
         rospy.Subscriber("/objects/spawn_request", Empty, self._cb_spawn)
         rospy.Subscriber("/objects/attach", String, self._cb_attach)
         rospy.Subscriber("/objects/detach", Empty, self._cb_detach)
+        # V55: explicit remove (operator manual cleanup during RESET).
+        # Payload is the CAFI id as a string ("12") or a known location
+        # tag ("at_vision", "in_fixture_A", "in_fixture_B", "on_conveyor")
+        # for bulk removal of every CAFI currently in that location.
+        rospy.Subscriber("/objects/remove_cafi", String,
+                         self._cb_remove_cafi)
         rospy.Subscriber("/objects/mark_riveted", String,
                          self._cb_mark_riveted)
         rospy.Subscriber("/objects/mark_verdict", String,
@@ -301,6 +379,10 @@ class ObjectManager(object):
 
         self.disc_state = "IDLE"
         self.stage = "IDLE"
+        # V53: physical fixture ids "A" / "B".  Station assignment
+        # published by rotary_fixture_sim is "A" / "B"; the URDF frame
+        # mapping (A -> "_1", B -> "_2") lives in _fixture_target_frame
+        # / _fixture_pick_frame helpers above.
         self.outer_id = "A"      # initial default; refreshed by station msg
         self.inner_id = "B"
 
@@ -444,15 +526,21 @@ class ObjectManager(object):
                 if dest == "fixture_outer":
                     c.fixture_id = self.outer_id
                     c.location = "settling_fixture"
-                    c.target_seat = "fixture_" + c.fixture_id + "_cafi_seat"
+                    # V52: target seat is the new turntable's
+                    # fixture_X_cafi_lateral_target_frame (X = 1 or 2);
+                    # the legacy fixture_X_cafi_seat frame no longer
+                    # exists because fixture_rivet.xacro was removed.
+                    c.target_seat = _fixture_target_frame(c.fixture_id)
                     c.vz = 0.0
                     c.z = c.z + 0.030
+                    self._init_smooth_settle(c)
                 elif dest == "fixture_inner":
                     c.fixture_id = self.inner_id
                     c.location = "settling_fixture"
-                    c.target_seat = "fixture_" + c.fixture_id + "_cafi_seat"
+                    c.target_seat = _fixture_target_frame(c.fixture_id)
                     c.vz = 0.0
                     c.z = c.z + 0.030
+                    self._init_smooth_settle(c)
                 elif dest == "vision":
                     c.location = "settling_vision"
                     # The vision fixture link is named "fixture_2" in
@@ -461,6 +549,7 @@ class ObjectManager(object):
                     c.target_seat = "fixture_2_cafi_seat"
                     c.vz = 0.0
                     c.z = c.z + 0.030
+                    self._init_smooth_settle(c)
                 elif dest == "bin_accept":
                     c.location = "falling"
                     c.target_bin = "accept"
@@ -495,6 +584,39 @@ class ObjectManager(object):
                               new_outer, new_inner)
             self.outer_id = new_outer
             self.inner_id = new_inner
+
+    def _cb_remove_cafi(self, msg):
+        """V55: explicit removal of one or more CAFIs from the world.
+        Payload conventions:
+          "<int>"            -> remove the CAFI with that id (if any)
+          "at_vision"        -> remove every CAFI whose location == this
+          "in_fixture_A"     -> idem
+          "in_fixture_B"     -> idem
+          "on_conveyor"      -> idem
+          "*"                -> remove ALL CAFIs (hard reset)
+        """
+        payload = (msg.data or "").strip()
+        if not payload:
+            return
+        with self.lock:
+            before = len(self.cafis)
+            if payload == "*":
+                removed = [c.id for c in self.cafis]
+                self.cafis = []
+            elif payload.lstrip("-").isdigit():
+                cid = int(payload)
+                removed = [c.id for c in self.cafis if c.id == cid]
+                self.cafis = [c for c in self.cafis if c.id != cid]
+            else:
+                # location tag (with or without "_A"/"_B" suffix)
+                tag = payload
+                removed = [c.id for c in self.cafis if c.location == tag]
+                self.cafis = [c for c in self.cafis if c.location != tag]
+            rospy.loginfo("[OBJ] remove_cafi(%s) -> %d removed "
+                          "(was %d, now %d): ids=%s",
+                          payload, len(removed), before,
+                          len(self.cafis), removed)
+            self._publish_states()
 
     def _cb_mark_riveted(self, msg):
         with self.lock:
@@ -546,6 +668,30 @@ class ObjectManager(object):
     # =========================================================
     # SNAP HELPERS - full pose from TF (V23)
     # =========================================================
+    def _init_smooth_settle(self, c):
+        """V54: snapshot the CAFI pose at detach so the settling phase
+        can slerp orientation + lerp XY toward the URDF frame as the
+        CAFI falls — no abrupt snap at cradle contact.  Called by
+        _cb_detach right after switching the CAFI to settling_* state.
+        """
+        # Target seat pose looked up from TF now.  If lookup fails we
+        # still set start snapshots; tick() will fall back gracefully.
+        try:
+            t = self.tf_buf.lookup_transform(
+                "world", c.target_seat,
+                rospy.Time(0), rospy.Duration(0.2))
+            sp, sq = tf_msg_to_pose(t)
+        except Exception:
+            sp, sq = (c.x, c.y, c.z), q_identity()
+        c.settle_start_z = c.z
+        c.settle_target_z = sp[2]
+        c.settle_start_xy = (c.x, c.y)
+        c.settle_target_xy = (sp[0], sp[1])
+        c.settle_start_q = (c.qx, c.qy, c.qz, c.qw)
+        # Target orientation = spawn_q (= conveyor orientation =
+        # fixture's natural CAFI orientation per the URDF static mesh).
+        c.settle_target_q = q_from_rpy(0.0, math.pi, math.pi)
+
     def _snap_to_frame(self, c, frame_name):
         """V44 rigid-body follow: pose = seat_pose * t_seat_cafi.
 
@@ -571,11 +717,11 @@ class ObjectManager(object):
         except Exception as e:
             rospy.logwarn("[OBJ] snap_to_frame(%s) TF fail: %s -> using "
                           "fallback XY only", frame_name, e)
-            if "fixture_A" in frame_name:
+            if "fixture_1" in frame_name or "fixture_A" in frame_name:
                 c.set_pose((DISC_CENTER_X, DISC_CENTER_Y - MOUNT_RADIUS,
                             CAFI_REST_Z),
                            (c.qx, c.qy, c.qz, c.qw))
-            elif "fixture_B" in frame_name:
+            elif "fixture_2" in frame_name or "fixture_B" in frame_name:
                 c.set_pose((DISC_CENTER_X, DISC_CENTER_Y + MOUNT_RADIUS,
                             CAFI_REST_Z),
                            (c.qx, c.qy, c.qz, c.qw))
@@ -638,16 +784,24 @@ class ObjectManager(object):
                     except Exception:
                         pass
                 elif c.location in ("in_fixture_A", "in_fixture_B"):
-                    # V26: snap by fixture_id (independent of outer/inner)
-                    seat = "fixture_" + c.fixture_id + "_cafi_seat"
+                    # V53: rigid-body follow the URDF frame.  Because
+                    # release_at_seat captured t_seat_cafi as IDENTITY
+                    # (CAFI snapped exactly onto the frame), this is a
+                    # pure pose tracker: c.pos = frame_pos, c.quat =
+                    # frame_quat * spawn_quat.  When the disc indexes,
+                    # the frame rotates and the CAFI rotates with it.
+                    seat = _fixture_target_frame(c.fixture_id)
                     self._snap_to_frame(c, seat)
                 elif c.location == "at_vision":
                     self._snap_to_vision(c)
                 elif c.location in ("settling_fixture", "settling_vision"):
-                    # V28: gravity-based settling - visible drop until the
-                    # CAFI bottom reaches the seat top, then small XY
-                    # assist to center on the cradle.  This replaces the
-                    # V27 instant snap that the user rejected.
+                    # V54 smooth-settle: the URDF frame is still the
+                    # authoritative pose, but instead of snapping
+                    # XY+orientation only at the moment of cradle
+                    # contact, we INTERPOLATE both during the gravity
+                    # fall.  By the time c.z reaches target_z the CAFI
+                    # is already at the URDF frame XYZ + spawn_q
+                    # orientation — no visible abrupt snap.
                     try:
                         t = self.tf_buf.lookup_transform(
                             "world", c.target_seat,
@@ -660,65 +814,73 @@ class ObjectManager(object):
                                       else "at_vision")
                         continue
 
-                    # Apply gravity
+                    # Update target snapshot in case the disc indexed
+                    # during settle (rare but possible).
+                    c.settle_target_xy = (sp[0], sp[1])
+                    c.settle_target_z  = sp[2]
+
+                    # Gravity drop in Z.
                     c.vz = max(-MAX_FALL_VZ, c.vz - GRAVITY * dt)
                     c.z += c.vz * dt
+                    target_z = c.settle_target_z
 
-                    # Seat target height (CAFI center should land on
-                    # seat XYZ, which already accounts for cradle top
-                    # plus half CAFI height).
-                    target_z = sp[2]
-                    # V44 capture rigid-body offset CAFI-vs-seat ONCE on
-                    # the way down (first time TF lookup succeeded).
-                    # We use the LATEST seat_q here so the offset
-                    # records the orientation difference at settle.
-                    seat_q = sq
+                    # Progress = how far Z has fallen toward target.
+                    z_start = c.settle_start_z if c.settle_start_z is not None else c.z
+                    if z_start <= target_z + 1e-6:
+                        prog = 1.0
+                    else:
+                        prog = (z_start - c.z) / max(1e-6, z_start - target_z)
+                        prog = max(0.0, min(1.0, prog))
+
+                    # Smoothly interpolate XY toward target.
+                    if c.settle_start_xy is not None:
+                        sx, sy = c.settle_start_xy
+                        tx, ty = c.settle_target_xy
+                        c.x = sx + (tx - sx) * prog
+                        c.y = sy + (ty - sy) * prog
+                    # Smoothly slerp orientation toward spawn_q.
+                    if c.settle_start_q is not None and c.settle_target_q is not None:
+                        q_interp = q_slerp(c.settle_start_q,
+                                           c.settle_target_q, prog)
+                        c.qx, c.qy, c.qz, c.qw = q_interp
+
                     if c.z <= target_z:
-                        # V44: release height shrunk to +20 mm and the
-                        # cobot IK places the gripper coaxial with the
-                        # seat (sub-mm error), so the XY mismatch at
-                        # release is ALREADY tiny.  V44 limits the
-                        # snap assist to 5 mm (was 100 mm) so the
-                        # settle does NOT visually look like a snap.
-                        # If the CAFI is further than 5 mm from the
-                        # seat in XY at settle time it stays where it
-                        # is — that's a bug to fix upstream, not to
-                        # mask with a magic snap.
-                        dx = sp[0] - c.x
-                        dy = sp[1] - c.y
-                        c.x += max(-0.005, min(0.005, dx))
-                        c.y += max(-0.005, min(0.005, dy))
-                        c.z = target_z
+                        # Final lock-in: ensure pose is exactly on the
+                        # URDF frame (compensates for any sub-tick
+                        # residual).  Captures the rigid-body offset
+                        # so the CAFI follows disc indexing.
+                        spawn_q = q_from_rpy(0.0, math.pi, math.pi)
+                        c.x = sp[0]
+                        c.y = sp[1]
+                        c.z = sp[2]
                         c.vz = 0.0
-                        # V44 capture rigid-body offset CAFI-vs-seat
-                        # at settle.  Position offset is computed AFTER
-                        # the 5 mm assist so it stays tiny; orientation
-                        # offset is the orientation difference between
-                        # the CAFI (as released) and the seat at this
-                        # instant.  From now on the CAFI follows the
-                        # seat as a rigid body — disc rotation moves
-                        # both position AND orientation in lockstep,
-                        # but the orientation set at release is
-                        # PRESERVED (no magic snap).
-                        p_inv, q_inv = pose_inverse(sp, seat_q)
-                        p_rel, q_rel = pose_compose(
-                            p_inv, q_inv, c.pos, c.quat)
-                        c.t_seat_cafi_p = p_rel
-                        c.t_seat_cafi_q = q_rel
+                        c.qx, c.qy, c.qz, c.qw = spawn_q
+                        _, q_inv = pose_inverse((0.0, 0.0, 0.0), sq)
+                        c.t_seat_cafi_p = (0.0, 0.0, 0.0)
+                        c.t_seat_cafi_q = q_normalize(
+                            q_mul(q_inv, spawn_q))
+                        # Reset settle snapshot (settle complete).
+                        c.settle_start_z = None
+                        c.settle_target_z = None
+                        c.settle_start_xy = None
+                        c.settle_target_xy = None
+                        c.settle_start_q = None
+                        c.settle_target_q = None
                         if c.location == "settling_fixture":
                             c.location = "in_fixture_" + (c.fixture_id or "A")
                             rospy.loginfo(
-                                "[OBJ] CAFI %d settled into %s at "
-                                "world (%.3f, %.3f, %.3f) "
-                                "(orientation preserved from release)",
-                                c.id, c.location, c.x, c.y, c.z)
+                                "[OBJ] CAFI %d settled onto %s "
+                                "(frame=%s pos=(%.3f,%.3f,%.3f) "
+                                "quat=(%.3f,%.3f,%.3f,%.3f)) — smooth "
+                                "slerp+lerp, no abrupt snap.",
+                                c.id, c.location, c.target_seat,
+                                c.x, c.y, c.z, c.qx, c.qy, c.qz, c.qw)
                         else:
                             c.location = "at_vision"
                             rospy.loginfo(
-                                "[OBJ] CAFI %d settled at vision station "
-                                "world (%.3f, %.3f, %.3f) "
-                                "(orientation preserved from release)",
-                                c.id, c.x, c.y, c.z)
+                                "[OBJ] CAFI %d settled onto vision frame %s "
+                                "(pos=(%.3f,%.3f,%.3f), smooth interp.).",
+                                c.id, c.target_seat, c.x, c.y, c.z)
                 elif c.location == "falling":
                     c.vz = max(-MAX_FALL_VZ, c.vz - GRAVITY * dt)
                     c.z += c.vz * dt
