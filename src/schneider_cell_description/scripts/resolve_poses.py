@@ -291,19 +291,20 @@ def resolve_all():
         # pos_err < 10 mm across hundreds of seeds.
         if name in LOAD_RIVET_POSES:
             local_seeds = [list(prev_q), list(POSE_HOME_Q)]
-            # V57: PICK_CONVEYOR is resolved earlier in the POSE_TARGETS
-            # loop, so its J6 is available now.  Lock LOAD/RIVET J6 to
-            # the same value so the wrist NEVER rolls between PICK and
-            # PLACE — the CAFI stays visually still in the gripper
-            # during the carry, which is what the user asked for in V57.
-            j6_lock = (poses["PICK_CONVEYOR"][5]
-                       if "PICK_CONVEYOR" in poses else 0.0)
-            # V56: seed J5 hard at -pi/2 so the IK starts on the desired
-            # branch.  V57: also seed J6 at the lock value.
+            # V58: J6 is LEFT FREE in the LOAD/RIVET branch so the IK
+            # naturally aligns the gripper yaw with the rivet fixture's
+            # CAFI cradle (just like the vision fixture does).  The
+            # V57 hard J6=J6_PICK_CONV lock had the side-effect of
+            # placing the CAFI rotated ~150 deg out of the cradle —
+            # visually wrong even if mechanically reachable.  The
+            # PICK_CONV -> APPROACH_LOAD wrist twist is now absorbed
+            # during the long traverse between conveyor and fixture
+            # (just like vision and bins handle it).  The wrist still
+            # stays constant WITHIN the LOAD/RIVET group thanks to the
+            # post-process below (R_place_lock + qc[5]=q_place[5]).
             for _ in range(300):
                 s = gen_seed(rng)
                 s[4] = -math.pi / 2 + rng.uniform(-0.05, 0.05)
-                s[5] = j6_lock + rng.uniform(-0.05, 0.05)
                 local_seeds.append(s)
             scored = []
             for seed in local_seeds:
@@ -312,20 +313,19 @@ def resolve_all():
                     seed, p_target_center, R_target=None,
                     max_iter=400, pos_tol=1e-5,
                     damping=0.05, step_clip=0.20)
-                # V56: lock J5 = -pi/2 and V57: lock J6 = j6_lock after
-                # the position pass; the next IK re-solves absorb them.
-                q = list(q); q[4] = -math.pi / 2; q[5] = j6_lock
+                # V56 lock J5 = -pi/2 (V58: J6 is free again).
+                q = list(q); q[4] = -math.pi / 2
                 q, _, _, _ = damped_ls_ik(
                     q, p_target_center, R_target=None,
                     max_iter=300, pos_tol=1e-4,
                     damping=0.05, step_clip=0.15)
-                q = list(q); q[4] = -math.pi / 2; q[5] = j6_lock
+                q = list(q); q[4] = -math.pi / 2
                 M = fk_world_to_grasp_center(q)
                 if float(np.linalg.norm(
-                        p_target_center - pos(M))) > 1e-2:
+                        p_target_center - pos(M))) > 5e-3:
                     continue
                 if not use_lateral:
-                    qc = smooth_q(q); qc[4] = -math.pi / 2; qc[5] = j6_lock
+                    qc = smooth_q(q); qc[4] = -math.pi / 2
                     Mc = fk_world_to_grasp_center(qc)
                     err_final = float(np.linalg.norm(
                         p_target_center - pos(Mc)))
@@ -334,12 +334,12 @@ def resolve_all():
                         rot_err_z = float(np.linalg.norm(
                             rot_mat(Mc)[:, 2] - R_top_down[:, 2]))
                         j5_err = abs(qc[4] + math.pi / 2)
-                        j6_err = abs(qc[5] - j6_lock)
-                        scored.append((j5_err + j6_err, rot_err_z, qc, err_final, 0,
+                        scored.append((j5_err, rot_err_z, qc, err_final, 0,
                                        min_jz, p_target_center))
                     continue
-                # Phase 2: iterative lateral-shift refinement (V56 also
-                # re-locks J5 after each iter; V57 also re-locks J6).
+                # Phase 2: iterative lateral-shift refinement (V56 re-
+                # locks J5 after each iter; V58: J6 stays free so the
+                # gripper yaw can align with the fixture cradle).
                 for _it in range(8):
                     delta_w = lateral_grasp_delta_world(q)
                     p_shifted = p_target_center + delta_w
@@ -348,16 +348,15 @@ def resolve_all():
                         max_iter=400, pos_tol=1e-5,
                         damping=0.03, step_clip=0.10)
                     q_new = list(q_new); q_new[4] = -math.pi / 2
-                    q_new[5] = j6_lock
                     M_new = fk_world_to_grasp_center(q_new)
                     if float(np.linalg.norm(
-                            p_shifted - pos(M_new))) > 2e-2:
+                            p_shifted - pos(M_new))) > 1e-2:
                         break
                     change = max(abs(q_new[i] - q[i]) for i in range(6))
                     q = q_new
                     if change < 1e-3:
                         break
-                qc = smooth_q(q); qc[4] = -math.pi / 2; qc[5] = j6_lock
+                qc = smooth_q(q); qc[4] = -math.pi / 2
                 Mc = fk_world_to_grasp_center(qc)
                 delta_w_final = lateral_grasp_delta_world(qc)
                 p_shifted_final = p_target_center + delta_w_final
@@ -366,15 +365,12 @@ def resolve_all():
                 rot_err_z = float(np.linalg.norm(
                     rot_mat(Mc)[:, 2] - R_top_down[:, 2]))
                 min_jz, fails = joint_mesa_clearance(qc)
-                # V57: loosened to 25 mm: J5 + J6 hard locks remove two
-                # IK DoF so the achievable pos_err is higher in worst seeds.
-                if err_final <= 0.025 and not fails:
+                if err_final <= 0.015 and not fails:
                     j5_err = abs(qc[4] + math.pi / 2)
-                    j6_err = abs(qc[5] - j6_lock)
-                    scored.append((j5_err + j6_err, rot_err_z, qc, err_final, 0,
+                    scored.append((j5_err, rot_err_z, qc, err_final, 0,
                                    min_jz, p_shifted_final))
-            # V57: prefer solutions where J5+J6 actually landed at the
-            # locks, then small rot tilt, then small pos err.
+            # V58: prefer solutions where J5 landed at -pi/2, then
+            # small rot tilt, then small pos err.
             scored.sort(key=lambda s: (s[0], s[1], s[3]))
             for s in scored[:8]:
                 lock_err, rot_err_z, qc, err_final, iters_b, min_jz, p_shifted_use = s
@@ -529,8 +525,15 @@ def resolve_all():
             # whatever pose the position-only IK finds NEAR q_place's
             # wrist (seeded by it).
             q = list(q_place)
-            j6_lock_pp = (poses["PICK_CONVEYOR"][5]
-                          if "PICK_CONVEYOR" in poses else q_place[5])
+            # V58: propagate PLACE_LOAD's J6 (the fixture-aligned wrist
+            # yaw the IK chose) to every other LOAD/RIVET pose so the
+            # gripper holds the CAFI at the SAME orientation across
+            # APPROACH -> PLACE -> RELEASE -> RETREAT -> PICK_RIVETED
+            # -> LIFT_RIVETED — no wrist roll WITHIN the group; the
+            # single twist happens during the long traverse from
+            # LIFT_CONVEYOR to APPROACH_LOAD (which is fine because
+            # the CAFI is not yet near the cradle).
+            j6_carry = q_place[5]
             for _it in range(6):
                 delta_w = lateral_grasp_delta_world(q)
                 p_shifted = p_target_center + delta_w
@@ -538,17 +541,16 @@ def resolve_all():
                     q, p_shifted, R_target=R_place_lock,
                     max_iter=400, pos_tol=1e-4, rot_tol=0.40,
                     damping=0.05, step_clip=0.15)
-                # V56: re-lock J5 = -pi/2 and V57: re-lock J6 to the
-                # PICK_CONVEYOR value so APPROACH / RETREAT / LIFT also
-                # enforce the wrist-flat + no-twist constraint,
-                # matching PLACE_LOAD.
+                # V56 lock J5 = -pi/2.  V58: lock J6 to PLACE_LOAD's
+                # value (NOT to PICK_CONV) so the cradle orientation
+                # is preserved through APPROACH/RETREAT/LIFT.
                 q_new = list(q_new); q_new[4] = -math.pi / 2
-                q_new[5] = j6_lock_pp
+                q_new[5] = j6_carry
                 if max(abs(q_new[i] - q[i]) for i in range(6)) < 1e-3:
                     q = q_new
                     break
                 q = q_new
-            qc = smooth_q(q); qc[4] = -math.pi / 2; qc[5] = j6_lock_pp
+            qc = smooth_q(q); qc[4] = -math.pi / 2; qc[5] = j6_carry
             Mc = fk_world_to_grasp_center(qc)
             delta_w_final = lateral_grasp_delta_world(qc)
             p_shifted_final = p_target_center + delta_w_final
