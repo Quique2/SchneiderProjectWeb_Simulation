@@ -51,10 +51,11 @@ from visualization_msgs.msg import Marker, MarkerArray
 # ============================================================
 BELT_TOP_Z      = 1.070      # mesa top (1.000) + belt rise (0.070)
 BELT_Y          = 1.365      # belt centre Y per DXF (LWPOLYLINE #47)
-# V39 belt direction: CAFI enters from "Suministro CAFI" at the EAST
-# (xyz="1.620 1.365 1.0075" in URDF) and travels WEST to the pick.
-SPAWN_X         = 1.620      # suministro east end
-PICK_X          = 1.235      # west pick (belt centre - 0.135 notch)
+# V57: conveyor + suministro shifted EAST by +0.300 m.  CAFI enters
+# from suministro at world X = 1.920 (was 1.620) and travels WEST to
+# the pick at world X = 1.535 (was 1.235).
+SPAWN_X         = 1.920      # suministro east end (V57)
+PICK_X          = 1.535      # west pick (belt centre - 0.135 notch) (V57)
 
 # V52 disc layout from the new turntable_rivet_cell URDF.  V56 shifts
 # the whole riveting_zone EAST by +0.300 m so the cobot can reach the

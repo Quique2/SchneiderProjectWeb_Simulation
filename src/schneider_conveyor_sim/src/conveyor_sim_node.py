@@ -82,17 +82,19 @@ from std_msgs.msg import Bool, Empty, String
 # belt at (1.370, 1.365)).  V39 fixes them.
 # ============================================================
 BELT_TOP_Z      = 1.070          # mesa top (1.000) + belt rise (0.070)
-BELT_X_WEST     = 1.183          # belt centre (1.370) - half length (0.187)
-BELT_X_EAST     = 1.620          # suministro east face
+# V57 shifts the whole conveyor + suministro + sensor EAST by +0.300 m
+# so the cobot can pick at world X=1.535 (within a healthy reach
+# radius) and place the CAFI at the LOAD seat without rotating the
+# wrist (J6_PLACE_LOAD == J6_PICK_CONVEYOR — see resolve_poses.py).
+BELT_X_WEST     = 1.483          # belt centre (1.670) - half length (0.187)
+BELT_X_EAST     = 1.920          # suministro east face (V57)
 BELT_Y          = 1.365          # belt centre Y per DXF
-# V39: CAFI enters from "Suministro CAFI" at the EAST end and travels
-# WEST to the pick at x=1.235 (south-rail notch).
-SPAWN_X         = 1.620
-PICK_X          = 1.235
+SPAWN_X         = 1.920
+PICK_X          = 1.535
 PICK_TOL_X      = 0.020          # +- 20 mm para considerar "en pick"
 
-# V39 sensor: SICK GRTE18S at (1.235, 1.290), beam crosses belt south->north.
-CONV_SENSOR_X       = 1.235
+# V57 sensor: SICK GRTE18S at (1.535, 1.290), beam crosses belt south->north.
+CONV_SENSOR_X       = 1.535
 CONV_SENSOR_HW_X    = 0.040
 CONV_SENSOR_Y_RANGE = (1.290, 1.440)
 CONV_SENSOR_Z       = BELT_TOP_Z + 0.0125    # CAFI centre height on belt

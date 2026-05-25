@@ -310,14 +310,18 @@
        z=1.018) so the V36 0.30 m elevated platform is no longer
        needed.  Bins and stations now rest directly on mesa top.   -->
 
-  <!-- ===== V38 Conveyor (DXF #47: 375 x 150 mm @ DXF 927.5, 775.7) ====
-       World (1.370, 1.365), top-of-belt at z = mesa_top + 0.070 = 1.070.
-       V38 picks on the LEFT side of the belt - notch at local X = -0.135
-       on the south rail, so the rail opening is at world X = 1.235
-       and the cobot grabs from the west (left) end.  Reach to that
-       point from the cobot at (1.252, 1.049) is just 0.353 m.        -->
+  <!-- ===== V57 Conveyor (shifted +0.300 m EAST vs V56) =================
+       Old anchor: (1.370, 1.365), pick at world X = 1.235.
+       New anchor: (1.670, 1.365), pick at world X = 1.535.
+       This is the SECOND +0.30 m shift in the East direction; together
+       with the V56 disc shift the LOAD seat and the conveyor pick are
+       both within a comfortable cobot reach radius, and locking
+       J6_PLACE_LOAD == J6_PICK_CONVEYOR finally becomes feasible.
+       Mesa span: x in [0.442, 2.062], y in [0.589, 1.509].
+       New conveyor span: x in [1.483, 1.858], y in [1.290, 1.440] —
+       still inside mesa with > 200 mm clearance to the east edge.   -->
   <xacro:conveyor_section name="conveyor_1" parent="world"
-                          xy_x="1.370" xy_y="1.365"
+                          xy_x="1.670" xy_y="1.365"
                           size_x="0.375"  size_y="0.150"
                           top_z="1.070"  body_height="0.065"
                           long_axis="x"
@@ -325,8 +329,7 @@
                           notch_n_x_local="-0.135"
                           notch_n_w="0.060"/>
 
-  <!-- ===== V38 Suministro CAFI (feeder at EAST end of belt; CAFIs are
-       fed in from the east and travel west to the left-side pick).  -->
+  <!-- ===== V57 Suministro CAFI (shifted +0.300 m EAST with conveyor) -->
   <link name="suministro_cafi">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -337,7 +340,7 @@
   <joint name="world_to_suministro_cafi" type="fixed">
     <parent link="world"/>
     <child  link="suministro_cafi"/>
-    <origin xyz="1.620 1.365 1.0075" rpy="0 0 0"/>
+    <origin xyz="1.920 1.365 1.0075" rpy="0 0 0"/>
   </joint>
 
   <!-- ===== Quality bins (preserved) ================================== -->
@@ -756,7 +759,7 @@
        the pick is at world X = 1.235 (west end), so the sensor faces
        NORTH across the belt right at the pick X.                      -->
   <xacro:sick_photoelectric name="sensor_conveyor_end" parent="world"
-                            face_x="1.235" face_y="1.290" face_z="1.100"
+                            face_x="1.535" face_y="1.290" face_z="1.100"
                             beam_yaw="1.5707963267948966"
                             mesa_z="1.000" beam_len="0.150"/>
 
@@ -778,7 +781,7 @@
   <!-- ===== V38 Actuators ============================================== -->
   <!-- Conveyor drive motor under EAST end of belt (V38 pick is on west). -->
   <xacro:conveyor_drive_motor name="conveyor_drive_motor" parent="world"
-                              xy_x="1.550" xy_y="1.365" z="1.036"
+                              xy_x="1.850" xy_y="1.365" z="1.036"
                               axis_yaw="1.5707963267948966"/>
 
   <!-- V41: rotary_drive macro REMOVED.  V37/V38 installed a NEMA-17 +
