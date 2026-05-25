@@ -250,6 +250,16 @@ def resolve_all():
                                    s[i] + sgn * amt * (1 + 0.1*i)))
                 seeds.append(s)
         seeds.append(list(POSE_HOME_Q))
+        # V60: explicit "known-good" anchor seeds for VISION poses so
+        # the IK does NOT inherit the elbow-up branch the V60 J6=-pi/4
+        # lock forces on LOAD/RIVET.  Without this hint the chain of
+        # prev_q from LIFT_RIVETED steers vision to an elbow-up branch
+        # whose RETREAT_VISION->APPROACH_ACCEPT_BIN traverse swings
+        # the wrist within 22 mm of the bin tops (V55..V58 stayed on
+        # the elbow-down branch and traversed cleanly).
+        if "VISION" in name:
+            seeds.append([+0.111, +1.030, +0.158, +0.389, -1.567, +0.112])
+            seeds.append([+0.113, +1.677, -0.659, +0.553, -1.565, +0.113])
         for _ in range(SEEDS_PER_POSE):
             seeds.append(gen_seed(rng))
 
@@ -291,10 +301,14 @@ def resolve_all():
         # pos_err < 10 mm across hundreds of seeds.
         if name in LOAD_RIVET_POSES:
             local_seeds = [list(prev_q), list(POSE_HOME_Q)]
-            # V59: lock J6 to POSE_HOME_Q[5] (= 0) so the wrist roll
-            # at the rivet fixture matches the HOME orientation the
-            # user wants.  Seeds biased to (J5, J6) = (-pi/2, 0).
-            j6_lock = POSE_HOME_Q[5]
+            # V60: lock J6 to -pi/4 (= -45 deg) so the wrist at the
+            # rivet fixture is rotated -45 deg from HOME — the user
+            # wants this specific wrist yaw for both PICK and PLACE
+            # at rivet.  All 7 LOAD/RIVET poses share it so there is
+            # no wrist rotation WITHIN the manipulation group; the
+            # 45 deg twist relative to HOME is absorbed during the
+            # long traverse to/from the fixture.
+            j6_lock = -math.pi / 4.0
             for _ in range(300):
                 s = gen_seed(rng)
                 s[4] = -math.pi / 2 + rng.uniform(-0.05, 0.05)
@@ -482,6 +496,15 @@ def resolve_all():
                      err_final, err_final <= POS_TOL_M, iters))
         poses[name] = list(q_best)
         prev_q = q_best
+        # V60: after LIFT_RIVETED we exit the LOAD/RIVET group; the
+        # next pose is APPROACH_VISION on a completely different side
+        # of the cell.  Resetting prev_q to POSE_HOME prevents the
+        # elbow-up LOAD/RIVET seed (forced by the J6=-pi/4 lock) from
+        # contaminating the VISION IK branch and producing a curved
+        # traverse that grazes the bin tops.  PICK_CONVEYOR uses the
+        # same reset implicitly because it's seeded from HOME anyway.
+        if name == "LIFT_RIVETED":
+            prev_q = list(POSE_HOME_Q)
 
     # V54 post-process: lock the wrist of every LOAD/RIVET pose to the
     # wrist that PLACE_LOAD_FIXTURE settled on, so APPROACH→PLACE→
@@ -524,10 +547,9 @@ def resolve_all():
             # whatever pose the position-only IK finds NEAR q_place's
             # wrist (seeded by it).
             q = list(q_place)
-            # V59: lock J6 to POSE_HOME_Q[5] (= 0) for every LOAD/RIVET
-            # pose — the user wants the wrist roll at LOAD/RIVET to
-            # match HOME's J6 exactly.
-            j6_carry = POSE_HOME_Q[5]
+            # V60: lock J6 to -pi/4 (= -45 deg) for every LOAD/RIVET
+            # pose — user wants this specific wrist yaw at rivet.
+            j6_carry = -math.pi / 4.0
             for _it in range(6):
                 delta_w = lateral_grasp_delta_world(q)
                 p_shifted = p_target_center + delta_w

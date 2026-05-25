@@ -180,6 +180,13 @@ TRAJ_PICK_VISION = [
     "POSE_PLACE_VISION",
     "GRIPPER_CLOSE_AND_WAIT",
     "POSE_RETREAT_VISION",
+    # V60: forced return to HOME before PLACE_BIN, so the
+    # RETREAT_VISION -> APPROACH_*_BIN swing is broken into two
+    # clean traverses through HOME instead of one direct path that
+    # grazed the bin tops once LOAD/RIVET went elbow-up under the
+    # J6=-pi/4 lock.  Matches the V29 rule the other TRAJ_PLACE_*
+    # already use ("after every delivery, return to HOME").
+    "POSE_HOME",
 ]
 TRAJ_HOME = ["POSE_HOME"]
 

@@ -116,11 +116,15 @@ TRAJECTORIES = [
                        "POSE_RELEASE_VISION", "POSE_RETREAT_VISION",
                        "POSE_HOME"]),
     ("PICK_VISION",   ["POSE_HOME", "POSE_APPROACH_VISION",
-                       "POSE_PLACE_VISION", "POSE_RETREAT_VISION"]),
-    ("PLACE_ACCEPT",  ["POSE_RETREAT_VISION", "POSE_APPROACH_ACCEPT_BIN",
+                       "POSE_PLACE_VISION", "POSE_RETREAT_VISION",
+                       "POSE_HOME"]),
+    # V60: PLACE_*_BIN trajectories start from HOME (TRAJ_PICK_VISION
+    # ends at HOME in V60, breaking the previous direct
+    # RETREAT_VISION->APPROACH_BIN swing).
+    ("PLACE_ACCEPT",  ["POSE_HOME", "POSE_APPROACH_ACCEPT_BIN",
                        "POSE_DROP_ACCEPT_BIN", "POSE_APPROACH_ACCEPT_BIN",
                        "POSE_HOME"]),
-    ("PLACE_REJECT",  ["POSE_RETREAT_VISION", "POSE_APPROACH_REJECT_BIN",
+    ("PLACE_REJECT",  ["POSE_HOME", "POSE_APPROACH_REJECT_BIN",
                        "POSE_DROP_REJECT_BIN", "POSE_APPROACH_REJECT_BIN",
                        "POSE_HOME"]),
 ]
