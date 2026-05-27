@@ -218,8 +218,7 @@ def write_resolved_poses(pose_lib, path):
             "flipped by the elbow_connector's Ry(pi)).  Each joint vector\n"
             "places the gripper grasp center within 25 mm of the V60 world\n"
             "target (typical < 5 mm).  J5 = -pi/2 on every release pose,\n"
-            "J6 = -pi/4 on the 7 LOAD/RIVET poses (V60 wrist rule).\n\"\"\"\n")
-    lines = [head, "POSE_LIB = {\n"]
+            "J6 = -pi/4 on the 7 LOAD/RIVET poses (V60 wrist rule).\n\"\"\"\n\n")
     order = ["HOME", "APPROACH_CONVEYOR", "PICK_CONVEYOR", "LIFT_CONVEYOR",
              "APPROACH_LOAD_FIXTURE", "PLACE_LOAD_FIXTURE",
              "RELEASE_LOAD_FIXTURE", "RETREAT_LOAD_FIXTURE",
@@ -228,10 +227,18 @@ def write_resolved_poses(pose_lib, path):
              "RETREAT_VISION",
              "APPROACH_ACCEPT_BIN", "DROP_ACCEPT_BIN",
              "APPROACH_REJECT_BIN", "DROP_REJECT_BIN"]
+    lines = [head]
+    # Top-level POSE_NAME = [...] constants (robot_controller_node and
+    # other downstream modules read these as module attributes).
     for n in order:
         key = "POSE_" + n
         q = pose_lib[key]
-        lines.append("    \"{}\": {},\n".format(key, fmt_q(q)))
+        lines.append("{} = {}\n".format(key, fmt_q(q)))
+    # Dict form (also used by v57_collision_test and v61_polish_poses).
+    lines.append("\nPOSE_LIB = {\n")
+    for n in order:
+        key = "POSE_" + n
+        lines.append("    \"{}\": {},\n".format(key, key))
     lines.append("}\n")
     with open(path, "w") as f:
         f.write("".join(lines))
@@ -272,10 +279,31 @@ def main():
     # poses (PLACE / RELEASE) can be J6-locked to the same branch and
     # never flip to the wrist-flipped local minimum (J6 ~ +pi).
     vision_j6_anchor = None
+    # V62: poses that share a world target with an earlier pose reuse
+    # that pose's joint vector verbatim — eliminates spurious IK
+    # branch divergence (e.g. RETREAT_* swinging through the rivet
+    # disc just because IK picked a different solution).
+    SAME_TARGET_AS = {
+        "RETREAT_LOAD_FIXTURE":  "APPROACH_LOAD_FIXTURE",
+        "APPROACH_PICK_RIVETED": "APPROACH_LOAD_FIXTURE",
+        "RETREAT_VISION":        "APPROACH_VISION",
+    }
     for name, target in POSE_TARGETS:
         if name == "HOME":
             continue
         key = "POSE_" + name
+        if name in SAME_TARGET_AS:
+            twin_key = "POSE_" + SAME_TARGET_AS[name]
+            qc = list(pose_lib[twin_key])
+            Mc = fk_world_to_grasp_center(qc)
+            p_actual = (float(Mc[0,3]), float(Mc[1,3]), float(Mc[2,3]))
+            err_mm = 0.0
+            print("  {:<26s} reused from {}  J5={:+.3f} J6={:+.3f}  OK".format(
+                name, SAME_TARGET_AS[name], qc[4], qc[5]))
+            pose_lib[key] = qc
+            report.append((key, qc, p_actual, p_actual, err_mm, "OK"))
+            prev_q = qc
+            continue
         v60_seed = v60_resolved.POSE_LIB.get(key, prev_q)
         use_lat = name in LATERAL_GRASP_POSES
         # J5 = -pi/2 lock: all LOAD/RIVET poses (V58 rule, cradle alignment)
@@ -366,11 +394,28 @@ def main():
             # V61 collision-aware ranking: prefer obstacle-free candidates,
             # both statically and along the interpolated path from prev_q
             # and to/from POSE_HOME (every cycle traverses HOME).
+            #
+            # Priority ordering — err must clear POS_TOL_M FIRST, because
+            # a candidate that does not reach the target is useless
+            # regardless of collisions.  Mesa-safety still takes priority
+            # over everything else (a config below the mesa is invalid).
             collisions = _collision_violations(qc)
             traj_prev = _trajectory_violations(qc, prev_qq)
             traj_home = _trajectory_violations(qc, list(POSE_HOME_Q))
+            total_violations = collisions + traj_prev + traj_home
+            err_above_tol = 0 if err <= POS_TOL_M else 1
+            # V62 priority:
+            #   1. mesa_ok               (mandatory floor)
+            #   2. fully_valid           (reaches AND no collisions)
+            #   3. err_above_tol         (must reach the target)
+            #   4. total_violations      (then minimize collisions)
+            #   5. far_branch, at_limit  (then prefer well-conditioned)
+            #   6. err                   (final tiebreaker)
+            fully_valid = 0 if (err_above_tol == 0 and total_violations == 0) else 1
             return ((0 if mesa_ok else 1),
-                    collisions + traj_prev + traj_home,
+                    fully_valid,
+                    err_above_tol,
+                    total_violations,
                     far_branch, at_limit, err), mesa_ok
 
         best = None  # (rank, err, qc, p_used, p_actual, mesa_ok)
@@ -386,15 +431,14 @@ def main():
 
         _, err, qc, p_used, p_actual, mesa_ok = best
 
-        # V61 fallback: if best variant still > 25 mm, do random
-        # perturbations around prev_q (tight delta) before declaring
-        # failure.  Tight delta keeps the new pose on the same branch
-        # so the interpolated trajectory does not sweep through obstacles.
-        if err > POS_TOL_M:
+        # V62 fallback: if the current best isn't "fully valid" (reaches
+        # AND collision-free), explore more seeds.  Fully valid wins
+        # over reaches-only and over collision-only.
+        if best[0][1] != 0:  # fully_valid bit is 1
             import random as _r
             rng = _r.Random(hash(name) & 0xFFFFFFFF)
             base = list(prev_q)
-            for trial in range(120):
+            for trial in range(300):
                 sv = list(base)
                 for i in range(6):
                     sv[i] += rng.uniform(-0.5, 0.5)
