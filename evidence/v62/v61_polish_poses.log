@@ -1,0 +1,47 @@
+V61 pose polisher (V60 warm-starts → V61 chain)
+================================================================================
+  HOME                       (HOME, no target)
+  APPROACH_CONVEYOR          err   0.02 mm  J5=-0.626  J6=-0.267  mesa_ok=True OK
+  PICK_CONVEYOR              err   0.02 mm  J5=-0.633  J6=-0.258  mesa_ok=True OK
+  LIFT_CONVEYOR              err   0.02 mm  J5=-0.604  J6=-0.278  mesa_ok=True OK
+  APPROACH_LOAD_FIXTURE      err  51.23 mm  J5=-1.571  J6=-0.785  mesa_ok=True FAIL
+  PLACE_LOAD_FIXTURE         err   0.04 mm  J5=-1.571  J6=-0.785  mesa_ok=True OK
+  RELEASE_LOAD_FIXTURE       err   0.04 mm  J5=-1.571  J6=-0.785  mesa_ok=True OK
+  RETREAT_LOAD_FIXTURE       err   0.05 mm  J5=-1.571  J6=-0.785  mesa_ok=True OK
+  APPROACH_PICK_RIVETED      err   0.05 mm  J5=-1.571  J6=-0.785  mesa_ok=True OK
+  PICK_RIVETED               err   0.04 mm  J5=-1.571  J6=-0.785  mesa_ok=True OK
+  LIFT_RIVETED               err   0.05 mm  J5=-1.571  J6=-0.785  mesa_ok=True OK
+  APPROACH_VISION            err 111.15 mm  J5=-0.078  J6=-1.101  mesa_ok=True FAIL
+  PLACE_VISION               err   0.03 mm  J5=+0.449  J6=-0.876  mesa_ok=True OK
+  RELEASE_VISION             err 145.92 mm  J5=-1.571  J6=+3.050  mesa_ok=True FAIL
+  RETREAT_VISION             err 108.21 mm  J5=-1.839  J6=+2.730  mesa_ok=True FAIL
+  APPROACH_ACCEPT_BIN        err   0.03 mm  J5=-2.094  J6=+0.222  mesa_ok=True OK
+  DROP_ACCEPT_BIN            err   0.08 mm  J5=-1.571  J6=+0.155  mesa_ok=True OK
+  APPROACH_REJECT_BIN        err   0.03 mm  J5=-1.986  J6=+0.331  mesa_ok=True OK
+  DROP_REJECT_BIN            err   0.53 mm  J5=-1.571  J6=+0.160  mesa_ok=True OK
+
+Wrote /tmp/SchneiderProjectWeb_Simulation/src/schneider_cell_description/scripts/resolved_poses.py and /tmp/SchneiderProjectWeb_Simulation/src/schneider_cell_description/scripts/validate_robot_poses.txt
+
+Summary: 15/19 poses PASS (<= 25 mm cart err)
+
+Joint-mesa clearance (must be >= 1.005 m):
+  POSE_HOME                    min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_CONVEYOR       min_joint_Z=1.0867 m  PASS
+  POSE_PICK_CONVEYOR           min_joint_Z=1.0867 m  PASS
+  POSE_LIFT_CONVEYOR           min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_LOAD_FIXTURE   min_joint_Z=1.0867 m  PASS
+  POSE_PLACE_LOAD_FIXTURE      min_joint_Z=1.0867 m  PASS
+  POSE_RELEASE_LOAD_FIXTURE    min_joint_Z=1.0867 m  PASS
+  POSE_RETREAT_LOAD_FIXTURE    min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_PICK_RIVETED   min_joint_Z=1.0867 m  PASS
+  POSE_PICK_RIVETED            min_joint_Z=1.0867 m  PASS
+  POSE_LIFT_RIVETED            min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_VISION         min_joint_Z=1.0867 m  PASS
+  POSE_PLACE_VISION            min_joint_Z=1.0523 m  PASS
+  POSE_RELEASE_VISION          min_joint_Z=1.0867 m  PASS
+  POSE_RETREAT_VISION          min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_ACCEPT_BIN     min_joint_Z=1.0458 m  PASS
+  POSE_DROP_ACCEPT_BIN         min_joint_Z=1.0867 m  PASS
+  POSE_APPROACH_REJECT_BIN     min_joint_Z=1.0867 m  PASS
+  POSE_DROP_REJECT_BIN         min_joint_Z=1.0867 m  PASS
+Worst min_joint_Z = 1.0458 m, fails = 0

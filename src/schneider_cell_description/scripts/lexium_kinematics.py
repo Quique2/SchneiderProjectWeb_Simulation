@@ -103,7 +103,14 @@ import numpy as np
 JOINT1_XYZ = (0.1623, 0.0867, 0.0645)
 JOINT2_XYZ = (-0.0115, 0.0639, 0.0000)
 JOINT2_RPY = (0.0, 0.0, 0.05)  # V43: restored from the user URDF
-JOINT3_XYZ = (-0.0015, 0.2450, 0.2258)
+# V61: URDF DEFINITIVO extracts link_elbow_connector as an independent
+# link between link2_upper_arm and link3_forearm.  The fixed
+# joint_elbow_connector carries the (0, pi, 0) Y-flip of the original
+# pivot.  joint_3 then hangs off link_elbow_connector and its origin
+# is expressed in the elbow_connector frame (post Ry(pi)).
+ELBOW_CONNECTOR_XYZ = (0.001060, 0.243625, 0.119967)
+ELBOW_CONNECTOR_RPY = (0.0, math.pi, 0.0)
+JOINT3_XYZ = (0.002560, 0.001375, 0.113592)
 JOINT4_XYZ = (-0.0060, 0.2295, 0.1244)
 JOINT5_XYZ = (-0.0010, 0.0465, -0.2300)
 JOINT6_XYZ = (-0.0040, 0.0720, 0.0898)
@@ -259,10 +266,17 @@ def Trpy(xyz, rpy):
 # FK
 # ============================================================
 def fk_base_to_tool0(q):
-    """FK from base_link frame to tool0.  Returns 4x4 transform."""
+    """FK from base_link frame to tool0.  Returns 4x4 transform.
+
+    V61: inserts the fixed joint_elbow_connector (Ry(pi) at
+    ELBOW_CONNECTOR_XYZ) between Rz(q[1]) and the joint_3 translation,
+    matching the URDF DEFINITIVO chain.  Downstream chain (joint_4 ...
+    tool0) is byte-for-byte the old chain.
+    """
     M = np.eye(4)
     M = M @ T(*JOINT1_XYZ) @ Ry(q[0])
     M = M @ Trpy(JOINT2_XYZ, JOINT2_RPY) @ Rz(q[1])
+    M = M @ Trpy(ELBOW_CONNECTOR_XYZ, ELBOW_CONNECTOR_RPY)
     M = M @ T(*JOINT3_XYZ) @ Rz(q[2])
     M = M @ T(*JOINT4_XYZ) @ Rz(q[3])
     M = M @ T(*JOINT5_XYZ) @ Ry(q[4])
@@ -309,7 +323,8 @@ def fk_joint_origins_world(q):
     Tb = np.eye(4)
     Tj1 = Tb @ T(*JOINT1_XYZ) @ Ry(q[0])
     Tj2 = Tj1 @ Trpy(JOINT2_XYZ, JOINT2_RPY) @ Rz(q[1])
-    Tj3 = Tj2 @ T(*JOINT3_XYZ) @ Rz(q[2])
+    Telbow = Tj2 @ Trpy(ELBOW_CONNECTOR_XYZ, ELBOW_CONNECTOR_RPY)
+    Tj3 = Telbow @ T(*JOINT3_XYZ) @ Rz(q[2])
     Tj4 = Tj3 @ T(*JOINT4_XYZ) @ Rz(q[3])
     Tj5 = Tj4 @ T(*JOINT5_XYZ) @ Ry(q[4])
     Tj6 = Tj5 @ T(*JOINT6_XYZ) @ Rz(q[5])
@@ -318,6 +333,7 @@ def fk_joint_origins_world(q):
     out = {}
     for name, T_local in [
             ("base",   Tb), ("joint_1", Tj1), ("joint_2", Tj2),
+            ("elbow",  Telbow),
             ("joint_3", Tj3), ("joint_4", Tj4), ("joint_5", Tj5),
             ("joint_6", Tj6), ("tool0",   Ttool)]:
         v = Tw @ T_local @ np.array([0.0, 0.0, 0.0, 1.0])
