@@ -1,42 +1,39 @@
 <?xml version="1.0"?>
 <!--
-  lexium_cobot_with_final_gripper.xacro  -  V43 wrapper macro
+  lexium_cobot_with_final_gripper.xacro  -  V61 (URDF DEFINITIVO)
 
-  Faithful xacro macro derived from the user-corrected URDF
-  lexium_cobot_with_final_gripper.urdf shipped in
-  /home/student/planta Schneider/lexium_cobot_with_final_gripper_z_reference.zip
+  Wrapper xacro alrededor del URDF DEFINITIVO V61
+  (lexium_cobot_with_final_gripper.urdf, derivado del archivo provisto
+  en URDF_DEFINITIVO.zip "lexium_cobot_v26.urdf").
 
-  ABSOLUTE TRUTH source: the joint origins, axes, rpy, joint limits,
-  mesh-to-link assignment and the gripper geometry are byte-for-byte the
-  ones in that user-supplied URDF.  This macro ONLY:
+  Esta macro SOLO hace tres cosas mas alla del URDF original:
+    (1) prefija cada link/joint con ${name}_ para soportar multiples
+        instancias;
+    (2) reemplaza el `world_to_base_link_z_reference` del URDF por una
+        junta parametrizada parent->base_link (`${parent}_to_${name}_base_link`)
+        para anclar la macro en cualquier mount;
+    (3) expone un alias logico ${name}_tcp_grasp_center co-localizado con
+        tcp_link, que el resto de la planta (robot_controller,
+        object_manager, gripper sim, collision filter) direcciona por
+        nombre.
 
-    (1) prefixes every link/joint with ${name}_ so multiple instances
-        do not clash;
-    (2) replaces the URDF's `world_to_base_link_z_reference` fixed
-        joint with a parameter-driven parent->base_link joint so the
-        macro can be mounted at any anchor;
-    (3) exposes the in-URDF tcp_link as ${name}_tcp_link and adds an
-        explicit alias ${name}_tcp_grasp_center co-located with
-        tcp_link, so the rest of the planta can address the gripper's
-        working centre by name.
-
-  Nothing else is changed.  In particular:
-    * joint_2 origin rpy="0 0 0.05"    (the 2.86 deg CAD skew is kept
-      verbatim per the user's "no me cambies la cinematica" rule);
-    * appendage_prismatic_joint axis (0 1 0), limit [0, 0.028]   (V48: was [0, 0.015] in V46);
-    * tool0 -> gripper_base origin xyz="0 -0.07 0.015";
-    * gripper_base -> appendage_link is the prismatic joint;
-    * appendage_link -> tcp_link origin xyz="0.000250 0.060250 0.076750"
-      (the user-tuned working centre of the gripper).
+  Cinematica revolute/prismatic + visual origins + meshes son IDENTICOS al
+  URDF DEFINITIVO V61.  Se preserva la extraccion de link3_elbow_connector
+  como link independiente con `joint_elbow_connector` (fixed, rpy=(0,pi,0)).
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="lexium_cobot_with_final_gripper"
                params="name parent mount_xyz:='0 0 0' mount_rpy:='0 0 0'">
 
-    <!-- materials (per the source URDF) -->
+    <!-- materials -->
     <material name="${name}_lexium_grey"><color rgba="0.40 0.40 0.45 1.0"/></material>
     <material name="${name}_lexium_dark"><color rgba="0.25 0.25 0.28 1.0"/></material>
+    <material name="${name}_gripper_dark_gray"><color rgba="0.18 0.18 0.18 1"/></material>
+    <material name="${name}_gripper_light_gray"><color rgba="0.70 0.70 0.70 1"/></material>
+    <material name="${name}_gripper_medium_gray"><color rgba="0.45 0.45 0.45 1"/></material>
+    <material name="${name}_gripper_blue_gray"><color rgba="0.25 0.33 0.42 1"/></material>
+    <material name="${name}_gripper_red"><color rgba="0.85 0.05 0.05 1"/></material>
 
     <!-- ===== anchor (replaces world_to_base_link_z_reference) ========= -->
     <joint name="${parent}_to_${name}_base_link" type="fixed">
@@ -45,100 +42,139 @@
       <origin xyz="${mount_xyz}" rpy="${mount_rpy}"/>
     </joint>
 
-    <!-- ===== base_link (canonical) =================================== -->
+    <!-- ===== base_link =============================================== -->
     <link name="${name}_base_link">
-      <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link0_base.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_dark"/></visual>
-      <collision><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link0_base.STL" scale="0.001 0.001 0.001"/></geometry></collision>
-      <inertial><mass value="3.5"/><origin xyz="0.1623 0.0436 0.0645"/><inertia ixx="0.010" ixy="0" ixz="0" iyy="0.010" iyz="0" izz="0.008"/></inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link0_base.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_dark"/>
+      </visual>
     </link>
 
     <joint name="${name}_joint_1" type="revolute">
       <parent link="${name}_base_link"/><child link="${name}_link1_shoulder"/>
       <origin xyz="0.1623 0.0867 0.0645" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
-      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50.0"/>
-      <dynamics damping="0.5" friction="0.1"/>
+      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50"/>
     </joint>
 
     <link name="${name}_link1_shoulder">
-      <visual><origin xyz="-0.1623 -0.0867 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link1_shoulder_rotation.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <collision><origin xyz="-0.1623 -0.0867 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link1_shoulder_rotation.STL" scale="0.001 0.001 0.001"/></geometry></collision>
-      <inertial><mass value="2.0"/><origin xyz="0 0.062 0"/><inertia ixx="0.006" ixy="0" ixz="0" iyy="0.006" iyz="0" izz="0.004"/></inertial>
+      <visual>
+        <origin xyz="-0.1623 -0.0867 -0.0645" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link1_shoulder_rotation.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
     </link>
 
     <joint name="${name}_joint_2" type="revolute">
       <parent link="${name}_link1_shoulder"/><child link="${name}_link2_upper_arm"/>
-      <origin xyz="-0.0115 0.0639 0.0000" rpy="0 0 0.05"/>
+      <origin xyz="-0.0115 0.0639 0" rpy="0 0 0.05"/>
       <axis xyz="0 0 1"/>
-      <limit lower="-2.61799" upper="2.61799" velocity="3.14" effort="50.0"/>
-      <dynamics damping="0.5" friction="0.1"/>
+      <limit lower="-2.61799" upper="2.61799" velocity="3.14" effort="50"/>
     </joint>
 
     <link name="${name}_link2_upper_arm">
-      <visual><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link2_shoulder_connector.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <visual><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link2_elbow_joint.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <visual><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link3_elbow_connector.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <collision><origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link2_shoulder_connector.STL" scale="0.001 0.001 0.001"/></geometry></collision>
-      <inertial><mass value="1.8"/><origin xyz="0 0.075 0"/><inertia ixx="0.008" ixy="0" ixz="0" iyy="0.008" iyz="0" izz="0.003"/></inertial>
+      <visual>
+        <origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link2_shoulder_connector.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
+      <visual>
+        <origin xyz="-0.1508 -0.1506 -0.0645" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link2_elbow_joint.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
+    </link>
+
+    <!-- V61: link3_elbow_connector extracted as independent link,
+         heredando la rotacion 180Y concentrica del pivot. -->
+    <joint name="${name}_joint_elbow_connector" type="fixed">
+      <parent link="${name}_link2_upper_arm"/>
+      <child  link="${name}_link_elbow_connector"/>
+      <origin xyz="0.001060 0.243625 0.119967" rpy="0 3.14159265359 0"/>
+    </joint>
+
+    <link name="${name}_link_elbow_connector">
+      <visual>
+        <origin xyz="-0.151860 -0.394225 -0.172817" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link3_elbow_connector.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
     </link>
 
     <joint name="${name}_joint_3" type="revolute">
-      <parent link="${name}_link2_upper_arm"/><child link="${name}_link3_forearm"/>
-      <origin xyz="-0.0015 0.2450 0.2258" rpy="0 0 0"/>
+      <parent link="${name}_link_elbow_connector"/><child link="${name}_link3_forearm"/>
+      <origin xyz="0.002560 0.001375 0.113592" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
-      <limit lower="-2.61799" upper="2.61799" velocity="3.14" effort="50.0"/>
-      <dynamics damping="0.5" friction="0.1"/>
+      <limit lower="-2.61799" upper="2.61799" velocity="3.14" effort="50"/>
     </joint>
 
     <link name="${name}_link3_forearm">
-      <visual><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link3_forearm.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <visual><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_wrist3_cylinder.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <visual><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link5_wrist2_body.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <collision><origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link3_forearm.STL" scale="0.001 0.001 0.001"/></geometry></collision>
-      <inertial><mass value="1.2"/><origin xyz="0 0.117 0"/><inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.002"/></inertial>
+      <visual>
+        <origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link3_forearm.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
+      <visual>
+        <origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_wrist3_cylinder.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
+      <visual>
+        <origin xyz="-0.1493 -0.3956 -0.2903" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link5_wrist2_body.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
     </link>
 
     <joint name="${name}_joint_4" type="revolute">
       <parent link="${name}_link3_forearm"/><child link="${name}_link4_wrist1"/>
       <origin xyz="-0.0060 0.2295 0.1244" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
-      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50.0"/>
-      <dynamics damping="0.3" friction="0.05"/>
+      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50"/>
     </joint>
 
     <link name="${name}_link4_wrist1">
-      <visual><origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link4_wrist1_cylinder.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <visual><origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link5_wrist2_cylinder.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <collision><origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link4_wrist1_cylinder.STL" scale="0.001 0.001 0.001"/></geometry></collision>
-      <inertial><mass value="0.8"/><origin xyz="0 0.021 0"/><inertia ixx="0.002" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/></inertial>
+      <visual>
+        <origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link4_wrist1_cylinder.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
+      <visual>
+        <origin xyz="-0.1433 -0.6251 -0.4147" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link5_wrist2_cylinder.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
     </link>
 
     <joint name="${name}_joint_5" type="revolute">
       <parent link="${name}_link4_wrist1"/><child link="${name}_link5_wrist2"/>
       <origin xyz="-0.0010 0.0465 -0.2300" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
-      <limit lower="-2.09440" upper="2.09440" velocity="3.14" effort="50.0"/>
-      <dynamics damping="0.3" friction="0.05"/>
+      <limit lower="-2.09440" upper="2.09440" velocity="3.14" effort="50"/>
     </joint>
 
     <link name="${name}_link5_wrist2">
-      <visual><origin xyz="-0.1423 -0.6716 -0.1847" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_wrist3_upper_body.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_grey"/></visual>
-      <collision><origin xyz="-0.1423 -0.6716 -0.1847" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_wrist3_upper_body.STL" scale="0.001 0.001 0.001"/></geometry></collision>
-      <inertial><mass value="0.4"/><origin xyz="0 0.061 0"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+      <visual>
+        <origin xyz="-0.1423 -0.6716 -0.1847" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_wrist3_upper_body.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_grey"/>
+      </visual>
     </link>
 
     <joint name="${name}_joint_6" type="revolute">
       <parent link="${name}_link5_wrist2"/><child link="${name}_link6_wrist3"/>
       <origin xyz="-0.0040 0.0720 0.0898" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
-      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50.0"/>
-      <dynamics damping="0.2" friction="0.05"/>
+      <limit lower="-3.14159" upper="3.14159" velocity="3.14" effort="50"/>
     </joint>
 
     <link name="${name}_link6_wrist3">
-      <visual><origin xyz="-0.1383 -0.7436 -0.2745" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_tool_flange.STL" scale="0.001 0.001 0.001"/></geometry><material name="${name}_lexium_dark"/></visual>
-      <collision><origin xyz="-0.1383 -0.7436 -0.2745" rpy="0 0 0"/><geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_tool_flange.STL" scale="0.001 0.001 0.001"/></geometry></collision>
-      <inertial><mass value="0.3"/><origin xyz="0 0.034 0"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>
+      <visual>
+        <origin xyz="-0.1383 -0.7436 -0.2745" rpy="0 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/cobot/link6_tool_flange.STL" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_lexium_dark"/>
+      </visual>
     </link>
 
     <joint name="${name}_joint_tool0" type="fixed">
@@ -147,157 +183,85 @@
     </joint>
     <link name="${name}_tool0"/>
 
-    <!-- ===== gripper integrated in the new URDF ====================== -->
-    <!-- tool0 -> gripper_base (mount frame inside the gripper) -->
+    <!-- ===== gripper (URDF DEFINITIVO V61 verbatim) =================== -->
     <joint name="${name}_tool0_to_gripper_base" type="fixed">
       <parent link="${name}_tool0"/>
       <child  link="${name}_gripper_base"/>
-      <origin xyz="0.0 -0.07 0.015" rpy="0 0 0"/>
+      <origin xyz="0 -0.07 0.015" rpy="0 0 0"/>
     </joint>
     <link name="${name}_gripper_base"/>
 
-    <!-- V52: stump_center_marker debug sphere REMOVED (visual clutter). -->
-    <!-- V52: z_axis_reference debug cylinder REMOVED (visual clutter). -->
-
-    <!-- stump (mounting plate) -->
     <link name="${name}_stump_link">
       <visual>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/stump.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${name}_gripper_dark_gray">
-          <color rgba="0.18 0.18 0.18 1"/>
-        </material>
+        <origin xyz="0 0 0" rpy="-1.57079632679 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/stump.stl" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_gripper_dark_gray"/>
       </visual>
-      <collision>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/stump.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
     </link>
     <joint name="${name}_stump_fixed_joint" type="fixed">
-      <parent link="${name}_gripper_base"/>
-      <child  link="${name}_stump_link"/>
+      <parent link="${name}_gripper_base"/><child link="${name}_stump_link"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
-    <!-- fixture (housing) -->
     <link name="${name}_fixture_link">
       <visual>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/fixture.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${name}_gripper_light_gray">
-          <color rgba="0.70 0.70 0.70 1"/>
-        </material>
+        <origin xyz="0 0 0" rpy="-1.57079632679 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/fixture.stl" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_gripper_light_gray"/>
       </visual>
-      <collision>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/fixture.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
     </link>
     <joint name="${name}_fixture_fixed_joint" type="fixed">
-      <parent link="${name}_gripper_base"/>
-      <child  link="${name}_fixture_link"/>
+      <parent link="${name}_gripper_base"/><child link="${name}_fixture_link"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
-    <!-- fixture1 (thin lateral blade) -->
     <link name="${name}_fixture1_link">
       <visual>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/fixture1.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${name}_gripper_medium_gray">
-          <color rgba="0.45 0.45 0.45 1"/>
-        </material>
+        <origin xyz="0 0 0" rpy="-1.57079632679 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/fixture1.stl" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_gripper_medium_gray"/>
       </visual>
-      <collision>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/fixture1.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
     </link>
     <joint name="${name}_fixture1_fixed_joint" type="fixed">
-      <parent link="${name}_gripper_base"/>
-      <child  link="${name}_fixture1_link"/>
+      <parent link="${name}_gripper_base"/><child link="${name}_fixture1_link"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
-    <!-- neck -->
     <link name="${name}_neck_link">
       <visual>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/neck.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${name}_gripper_blue_gray">
-          <color rgba="0.25 0.33 0.42 1"/>
-        </material>
+        <origin xyz="0 0 0" rpy="-1.57079632679 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/neck.stl" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_gripper_blue_gray"/>
       </visual>
-      <collision>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/neck.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
     </link>
     <joint name="${name}_neck_fixed_joint" type="fixed">
-      <parent link="${name}_gripper_base"/>
-      <child  link="${name}_neck_link"/>
+      <parent link="${name}_gripper_base"/><child link="${name}_neck_link"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
-    <!-- moving jaw (appendage) -->
     <link name="${name}_appendage_link">
       <visual>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/appendage.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-        <material name="${name}_gripper_red">
-          <color rgba="0.85 0.05 0.05 1"/>
-        </material>
+        <origin xyz="0 0 0" rpy="-1.57079632679 0 0"/>
+        <geometry><mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/appendage.stl" scale="0.001 0.001 0.001"/></geometry>
+        <material name="${name}_gripper_red"/>
       </visual>
-      <collision>
-        <origin xyz="0 0 0" rpy="-1.5707963267948966 0 0"/>
-        <geometry>
-          <mesh filename="package://lexium_cobot_with_final_gripper/meshes/gripper/appendage.stl" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision>
     </link>
-
     <joint name="${name}_appendage_prismatic_joint" type="prismatic">
-      <parent link="${name}_gripper_base"/>
-      <child  link="${name}_appendage_link"/>
+      <parent link="${name}_gripper_base"/><child link="${name}_appendage_link"/>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="0.000" upper="0.028" effort="30" velocity="0.08"/>
-      <dynamics damping="1.0" friction="0.1"/>
     </joint>
 
-    <!-- TCP at the working tip of the gripper, EXACTLY as in the user's
-         URDF.  This is the centre of the area where the gripper clamps
-         around a workpiece (appendage tip + fixture1 blade midpoint). -->
     <link name="${name}_tcp_link"/>
     <joint name="${name}_tcp_fixed_joint" type="fixed">
-      <parent link="${name}_appendage_link"/>
-      <child  link="${name}_tcp_link"/>
+      <parent link="${name}_appendage_link"/><child link="${name}_tcp_link"/>
       <origin xyz="0.000250 0.060250 0.076750" rpy="0 0 0"/>
     </joint>
 
-    <!-- Explicit alias used by the planta: tcp_grasp_center.  Co-located
-         with tcp_link (zero offset), exposed as the "logical" TCP frame
-         that the object manager, robot controller, gripper sim and
-         collision filter all address by name.  Same as tcp_link but
-         carries a self-describing name for the rest of the system. -->
+    <!-- Alias logico usado por robot_controller, object_manager, gripper sim
+         y collision filter:  ${name}_tcp_grasp_center co-localizado con
+         ${name}_tcp_link. -->
     <link name="${name}_tcp_grasp_center"/>
     <joint name="${name}_tcp_grasp_center_fixed_joint" type="fixed">
       <parent link="${name}_tcp_link"/>
@@ -305,46 +269,11 @@
       <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
-    <!-- V52 visual cleanup: debug spheres / boxes removed.  The frames
-         themselves are kept as EMPTY links because robot_controller,
-         pose resolver and object_manager address them by name; only the
-         visual tags are dropped so RViz no longer shows the debug helpers
-         (transparent cyan grasp box, yellow contact spheres, green TCP
-         dot, yellow grasp-center dot). -->
-
-    <link name="${name}_gripper_grasp_center_frame"/>
-    <joint name="${name}_gripper_grasp_center_fixed_joint" type="fixed">
-      <parent link="${name}_gripper_base"/>
-      <child  link="${name}_gripper_grasp_center_frame"/>
-      <origin xyz="0.000000 0.016600 0.076750" rpy="0 0 0"/>
-    </joint>
-
-    <link name="${name}_appendage_inner_contact_frame"/>
-    <joint name="${name}_appendage_inner_contact_fixed_joint" type="fixed">
-      <parent link="${name}_appendage_link"/>
-      <child  link="${name}_appendage_inner_contact_frame"/>
-      <origin xyz="0.000250 0.060250 0.076750" rpy="0 0 0"/>
-    </joint>
-
-    <link name="${name}_fixed_jaw_inner_contact_frame"/>
-    <joint name="${name}_fixed_jaw_inner_contact_fixed_joint" type="fixed">
-      <parent link="${name}_gripper_base"/>
-      <child  link="${name}_fixed_jaw_inner_contact_frame"/>
-      <origin xyz="0.000000 -0.027050 0.076750" rpy="0 0 0"/>
-    </joint>
-
     <link name="${name}_cafi_lateral_target_frame"/>
     <joint name="${name}_cafi_lateral_target_fixed_joint" type="fixed">
       <parent link="${name}_gripper_base"/>
       <child  link="${name}_cafi_lateral_target_frame"/>
       <origin xyz="0.000000 0.016600 0.076750" rpy="0 0 0"/>
-    </joint>
-
-    <link name="${name}_grasp_volume_frame"/>
-    <joint name="${name}_grasp_volume_fixed_joint" type="fixed">
-      <parent link="${name}_cafi_lateral_target_frame"/>
-      <child  link="${name}_grasp_volume_frame"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
   </xacro:macro>
