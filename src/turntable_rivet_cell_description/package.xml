@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>turntable_rivet_cell_description</name>
+  <version>0.0.1</version>
+  <description>URDF description for rotating table, rivet fixture, CAFI, solenoid, piston and NEMA 17 placeholder.</description>
+  <maintainer email="miguelordonez681@gmail.com">Miguel Ordoñez</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>xacro</exec_depend>
+</package>

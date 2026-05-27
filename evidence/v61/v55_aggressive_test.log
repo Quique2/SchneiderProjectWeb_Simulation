@@ -1,0 +1,4 @@
+TEST 1 OK: 52 CAFIs through the cell, no fault, no watchdog, cabin transitions=313
+TEST 2 OK: START -> STOP -> RESET cycle with gripper CLOSED. Cleanup order removed=['11', '12', '13'], cell back to IDLE, cabin LOWERED, started_once=False.
+
+ALL V55 AGGRESSIVE TESTS PASSED.

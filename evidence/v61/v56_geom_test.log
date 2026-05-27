@@ -1,0 +1,19 @@
+V56 geometry verification
+------------------------------------------------------------
+Expected LOAD seat world XYZ: (0.9802759999999999, 1.157611, 1.104476)
+
+pose                                 J5 deg  OK J5
+POSE_APPROACH_LOAD_FIXTURE         -90.0000     OK
+POSE_PLACE_LOAD_FIXTURE            -90.0000     OK
+POSE_RELEASE_LOAD_FIXTURE          -90.0000     OK
+POSE_RETREAT_LOAD_FIXTURE          -90.0000     OK
+POSE_APPROACH_PICK_RIVETED         -90.0000     OK
+POSE_PICK_RIVETED                  -90.0000     OK
+POSE_LIFT_RIVETED                  -90.0000     OK
+
+PLACE_LOAD_FIXTURE TCP world: (0.9369, 1.1587, 1.1002)
+PLACE_LOAD_FIXTURE CAFI world (= TCP - delta_w_lateral): (0.9803, 1.1576, 1.1045)
+Expected LOAD seat:           (0.9803, 1.1576, 1.1045)
+Error norm:                   0.04 mm
+
+V56 GEOMETRY TEST PASSED.

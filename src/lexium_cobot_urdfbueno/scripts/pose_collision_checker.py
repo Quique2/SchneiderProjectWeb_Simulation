@@ -64,17 +64,20 @@ OBSTACLES = [
     ("conveyor",         1.370 - 0.190, 1.370 + 0.190,
                          1.365 - 0.075, 1.365 + 0.075,
                          1.005, 1.070),
-    # Disc giratorio
-    ("disc_face",        0.692 - 0.200, 0.692 + 0.200,
-                         1.259 - 0.200, 1.259 + 0.200,
-                         1.005, 1.081),
-    # LOAD/RIVET fixtures on disc
-    ("fixture_LOAD",     0.737 - 0.060, 0.737 + 0.060,
-                         1.109 - 0.030, 1.109 + 0.030,
-                         1.081, 1.111),
-    ("fixture_RIVET",    0.737 - 0.060, 0.737 + 0.060,
-                         1.409 - 0.030, 1.409 + 0.030,
-                         1.081, 1.111),
+    # V52 new turntable disc face: bigger 0.500x0.500 plate on base_link
+    # (gearbase + bearingbase) and the rotating disc on top.  Bounding
+    # box covers the static base + rotating disc visuals.
+    ("disc_face",        0.692 - 0.260, 0.692 + 0.260,
+                         1.259 - 0.250, 1.259 + 0.250,
+                         1.005, 1.082),
+    # V52 new turntable LOAD fixture at world (0.680, 1.158, 1.104).
+    ("fixture_LOAD",     0.680 - 0.075, 0.680 + 0.075,
+                         1.158 - 0.060, 1.158 + 0.060,
+                         1.082, 1.140),
+    # V52 new turntable RIVET fixture at world (0.680, 1.360, 1.104).
+    ("fixture_RIVET",    0.680 - 0.075, 0.680 + 0.075,
+                         1.360 - 0.060, 1.360 + 0.060,
+                         1.082, 1.140),
     # V44 vision fixture cradle (moved WEST to 0.750)
     ("fixture_VISION",   0.750 - 0.075, 0.750 + 0.075,
                          0.804 - 0.075, 0.804 + 0.075,
@@ -129,10 +132,11 @@ OBSTACLES = [
     ("rivet_cabin",      0.692 - 0.225, 0.692 + 0.225,
                          1.459 - 0.150, 1.459 + 0.150,
                          1.300, 1.350),
-    # NEMA assembly east of disc, world (0.936, 1.259).
-    ("nema_motor",       0.936 - 0.035, 0.936 + 0.035,
-                         1.259 - 0.035, 1.259 + 0.035,
-                         1.000, 1.080),
+    # V52 NEMA placeholder mounted to the new turntable base_link at
+    # local (0.229, 0, 0.05) -> world (0.921, 1.259, 1.050).
+    ("nema_motor",       0.921 - 0.025, 0.921 + 0.025,
+                         1.259 - 0.025, 1.259 + 0.025,
+                         1.020, 1.080),
 ]
 
 
@@ -159,10 +163,14 @@ WHITELIST = [
     ("POSE_PICK_CONVEYOR",         "gripper_body", "conveyor"),
     ("POSE_PICK_CONVEYOR",         "tcp_tip",      "conveyor"),
 
-    # PLACE_LOAD_FIXTURE / PICK_RIVETED: TCP is over the cradle.  The
-    # gripper housing brushes the 60-mm-tall cradle by a few mm.
+    # PLACE_LOAD_FIXTURE / PICK_RIVETED / RELEASE_LOAD_FIXTURE: TCP is
+    # over the cradle.  The gripper housing brushes the new-turntable
+    # cradle (which is 58 mm tall now, 1.082..1.140 m) on the descending
+    # release as designed.  These are intentional contacts.
     ("POSE_PLACE_LOAD_FIXTURE",    "gripper_body", "fixture_LOAD"),
     ("POSE_PLACE_LOAD_FIXTURE",    "tcp_tip",      "fixture_LOAD"),
+    ("POSE_RELEASE_LOAD_FIXTURE",  "gripper_body", "fixture_LOAD"),
+    ("POSE_RELEASE_LOAD_FIXTURE",  "tcp_tip",      "fixture_LOAD"),
     ("POSE_PICK_RIVETED",          "gripper_body", "fixture_LOAD"),
     ("POSE_PICK_RIVETED",          "tcp_tip",      "fixture_LOAD"),
 

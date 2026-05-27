@@ -57,17 +57,19 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool, Empty, Float32, String, UInt8MultiArray
 
 
-DISC_JOINT     = "rotary_table_disc_axis_joint"
-A_PISTON       = "fixture_A_piston_joint"
-A_SOL_LEFT     = "fixture_A_solenoid_left_joint"
-B_PISTON       = "fixture_B_piston_joint"
-B_SOL_LEFT     = "fixture_B_solenoid_left_joint"
+# V52: the new turntable URDF exposes a single revolute joint
+# (table_rotation_joint) for the disc and NO piston / solenoid joints
+# (the pistons inside fixtures 1 and 2 are FIXED meshes per spec).  The
+# /disc/joints publication is therefore reduced to that single joint so
+# robot_state_publisher does not warn about missing joint names.  The
+# rest of the rivet-cycle topics (/rivet/active, /fixture/cafi_seated,
+# /fixture/load_present, /disc/station_assignment, ...) are kept intact
+# because downstream consumers (HMI, state_manager, object_manager) rely
+# on them; the seating + 30 s rivet timer remain time-based and no
+# longer animate a prismatic joint.
+DISC_JOINT     = "table_rotation_joint"
 
-# V25: solenoid_right joints REMOVED from URDF (per user brief).  Only
-# the LEFT solenoid remains per fixture.  Any code that referenced
-# A_SOL_RIGHT or B_SOL_RIGHT in V22-V24 is gone.
-ALL_JOINTS = [DISC_JOINT, A_PISTON, A_SOL_LEFT,
-              B_PISTON, B_SOL_LEFT]
+ALL_JOINTS = [DISC_JOINT]
 
 # Rates / limits
 DISC_INDEX_RATE_RAD_S = 1.2        # ~2.6 s para 180 deg (V23 visible in RViz)
@@ -98,22 +100,21 @@ class RotaryFixtureSim(object):
         self.B_sol_l  = 0.0;  self.B_sol_l_tgt  = 0.0
 
         # ====================================================
-        # V26: STATION ASSIGNMENT - which physical fixture is currently
-        # at which station.  The disc swaps these on every 180 deg index.
+        # V53: STATION ASSIGNMENT uses physical fixture ids "A" / "B"
+        # (the convention every existing consumer is wired for).  The
+        # mapping to the new turntable URDF's "_1" / "_2" frame suffix
+        # lives in _fix_frame_suffix() below — code never looks up the
+        # dict with a "1" / "2" key, so KeyError 'A' is impossible.
         # Initial state: fixture A at the LOAD (cobot-side, outer)
         #                fixture B at the RIVET (cabin-side, inner)
-        # state_manager and object_manager read this via /disc/station_assignment
-        # so they know which fixture is at which station at any moment.
         # ====================================================
         self.outer_id = "A"
         self.inner_id = "B"
 
-        # CAFI presence BY FIXTURE ID (not by station label).
-        # Updated from /objects/cafi_states with locations "in_fixture_A" /
-        # "in_fixture_B".  This is the V26 fix for the RIVET watchdog bug:
-        # the CAFI is tracked by which fixture it sits on, NOT by station,
-        # so when the disc swaps stations the rotary sim still knows that
-        # fixture A still has the CAFI, even though A is now at inner.
+        # CAFI presence BY FIXTURE ID (not by station label).  Updated
+        # from /objects/cafi_states with locations "in_fixture_A" /
+        # "in_fixture_B".  Tracking by fixture id keeps the rivet
+        # authorization correct after a disc index swap.
         self.fixture_has_cafi = {"A": False, "B": False}
         self.fixture_cafi_id  = {"A": None,  "B": None}
 
@@ -173,10 +174,10 @@ class RotaryFixtureSim(object):
         self.pub_rivet_active.publish(Bool(data=False))
         self._publish_station()
         self._publish_solenoids()
-        rospy.loginfo("[ROT] V35 rotary_fixture_sim init "
+        rospy.loginfo("[ROT] V52 rotary_fixture_sim init "
                       "(RIVET_DURATION_S=%.0f, outer=%s inner=%s); "
-                      "load_present + rivet_present + station_assignment "
-                      "publish heartbeat every tick (30 Hz)",
+                      "drives table_rotation_joint only; pistons are "
+                      "fixed meshes in the new turntable URDF",
                       RIVET_DURATION_S, self.outer_id, self.inner_id)
 
     def _publish_station(self):
@@ -268,26 +269,30 @@ class RotaryFixtureSim(object):
         except Exception:
             return
         with self.lock:
-            # V26: occupancy by FIXTURE ID, not station label.
-            new_a = None; new_b = None
+            # V53: occupancy by physical fixture ID "A" / "B".  Accept
+            # both the canonical "in_fixture_A" / "in_fixture_B" and
+            # the V52-transitional "in_fixture_1" / "in_fixture_2"
+            # for forward compatibility (if anything still emits them
+            # they map cleanly onto A / B).
+            _loc_to_fid = {
+                "in_fixture_A": "A", "in_fixture_B": "B",
+                "in_fixture_1": "A", "in_fixture_2": "B",
+            }
+            new_obj = {"A": None, "B": None}
             for c in data:
                 loc = c.get("location", "")
-                if loc == "in_fixture_A":
-                    new_a = c
-                elif loc == "in_fixture_B":
-                    new_b = c
-            has_a = new_a is not None
-            has_b = new_b is not None
-            if has_a != self.fixture_has_cafi["A"]:
-                self.fixture_has_cafi["A"] = has_a
-                self.fixture_cafi_id["A"]  = new_a.get("id") if new_a else None
-                rospy.loginfo("[ROT] fixture_A occupancy -> %s (cafi_id=%s)",
-                              has_a, self.fixture_cafi_id["A"])
-            if has_b != self.fixture_has_cafi["B"]:
-                self.fixture_has_cafi["B"] = has_b
-                self.fixture_cafi_id["B"]  = new_b.get("id") if new_b else None
-                rospy.loginfo("[ROT] fixture_B occupancy -> %s (cafi_id=%s)",
-                              has_b, self.fixture_cafi_id["B"])
+                fid = _loc_to_fid.get(loc)
+                if fid is not None:
+                    new_obj[fid] = c
+            for fid in ("A", "B"):
+                has = new_obj[fid] is not None
+                if has != self.fixture_has_cafi[fid]:
+                    self.fixture_has_cafi[fid] = has
+                    self.fixture_cafi_id[fid]  = (
+                        new_obj[fid].get("id") if new_obj[fid] else None)
+                    rospy.loginfo(
+                        "[ROT] fixture_%s occupancy -> %s (cafi_id=%s)",
+                        fid, has, self.fixture_cafi_id[fid])
             # Derived: which station has a CAFI (for /fixture/load_present
             # and /fixture/rivet_present, which the HMI still uses).
             # V35: ALSO publish from tick() as a heartbeat so a single
@@ -395,13 +400,14 @@ class RotaryFixtureSim(object):
                                   "(elapsed=%.1fs cafi_id=%s fixture=%s)",
                                   elapsed, inner_cafi, self.inner_id)
 
-            # Publish all joints (V25: solo left solenoids)
+            # V52: publish only the disc joint (pistons / solenoids are
+            # fixed meshes in the new turntable URDF; the seating logic
+            # above is purely time-based and no longer drives any
+            # prismatic joint).
             js = JointState()
             js.header.stamp = rospy.Time.now()
             js.name = ALL_JOINTS
-            js.position = [self.disc_pos,
-                           self.A_pist, self.A_sol_l,
-                           self.B_pist, self.B_sol_l]
+            js.position = [self.disc_pos]
             self.pub_joints.publish(js)
 
     def pub_mark_riveted(self, cafi_id):

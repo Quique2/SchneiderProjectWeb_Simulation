@@ -1,0 +1,4 @@
+TEST A OK: 200 CAFIs at 5.0s cadence, cell still RUNNING, cabin transitions=1201, no faults, no watchdogs.
+TEST B OK: 400 CAFIs (100 burst @4s + 300 steady @5s), PASS=267, FAIL=133, cell still RUNNING, no faults, no watchdogs.
+
+ALL V61 MAX-CAFI TESTS PASSED.

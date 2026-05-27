@@ -39,20 +39,19 @@ from sensor_msgs.msg import JointState
 from visualization_msgs.msg import MarkerArray
 
 
-# Every joint the V25 URDF expects.  V25: fixture_*_solenoid_right_joint
-# REMOVED (only LEFT solenoid per fixture, per user brief).
+# V52: piston / solenoid joints REMOVED.  The new turntable URDF has
+# FIXED pistons inside fixtures 1 and 2 (no prismatic actuation); the
+# only joint we still fuse from /disc/joints is table_rotation_joint.
 ALL_JOINTS = [
     "lexium_cobot_joint_1", "lexium_cobot_joint_2", "lexium_cobot_joint_3",
     "lexium_cobot_joint_4", "lexium_cobot_joint_5", "lexium_cobot_joint_6",
     # V43: gripper is part of the new cobot URDF; the prismatic joint is
     # now appendage_prismatic_joint (prefixed by the cobot instance name).
     "lexium_cobot_appendage_prismatic_joint",
-    "rotary_table_disc_axis_joint",
-    "fixture_A_piston_joint", "fixture_A_solenoid_left_joint",
-    "fixture_B_piston_joint", "fixture_B_solenoid_left_joint",
+    "table_rotation_joint",
 ]
 
-DISC_JOINT = "rotary_table_disc_axis_joint"
+DISC_JOINT = "table_rotation_joint"
 
 FUSE_HZ = 50.0
 

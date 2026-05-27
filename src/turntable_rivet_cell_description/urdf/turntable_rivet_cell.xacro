@@ -1,0 +1,563 @@
+<?xml version="1.0"?>
+<!--
+  turntable_rivet_cell.xacro  -  V52 wrapper macro.
+  ===========================================================================
+  This file wraps the byte-for-byte contents of turntable_rivet_cell.urdf
+  inside a xacro macro so the planta can mount the whole rivet station as
+  a single block at any pose without touching its internal layout.
+
+  Rules respected from the user spec:
+    * No internal joint origin or rpy is modified vs the original URDF.
+    * base_link, turntable_link, table_rotation_joint, fixtures, CAFI
+      debug frames, sensor pedestal, NEMA placeholder, belt and pick
+      frames are identical to the original URDF.
+    * The original URDF's "world" link and "world_to_base" fixed joint
+      are REMOVED here.  The macro's `parent`, `xyz` and `rpy`
+      parameters drive a single ${parent} -> base_link joint, which is
+      the ONLY transform that places the whole rivet station inside the
+      Schneider cell.
+    * The "debug CAFI" visuals inside the fixtures and the
+      grasp_volume / pick_frame marker visuals were stripped from the
+      URDF copy below per the V52 visual-cleanup spec:
+        - cafi_part_1_link / cafi_part_2_link keep their link name and
+          their joint chain so existing code that addresses the frame
+          still resolves, but they no longer render the static debug
+          CAFI mesh.
+        - fixture_1_grasp_volume_frame / fixture_2_grasp_volume_frame
+          keep their link names but no longer render the transparent
+          cyan grasp box.
+        - cafi_pick_frame_1 / cafi_pick_frame_2 keep their link names
+          but no longer render the red sphere marker.
+        - fixture_1_cafi_lateral_target_frame /
+          fixture_2_cafi_lateral_target_frame keep their link names
+          but no longer render the green drop marker.
+  These visual removals do NOT change any pose - the frames are intact
+  for the runtime to look up via TF and to use for PLACE_LOAD /
+  PICK_RIVETED IK targets.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="turntable_rivet_cell"
+               params="parent xyz:='0 0 0' rpy:='0 0 0'">
+
+    <!-- materials (same as URDF, kept inside the macro scope) -->
+    <material name="turntable_dark_gray"><color rgba="0.15 0.15 0.15 1"/></material>
+    <material name="turntable_industrial_gray"><color rgba="0.45 0.45 0.45 1"/></material>
+    <material name="turntable_silver"><color rgba="0.78 0.78 0.78 1"/></material>
+    <material name="turntable_motor_black"><color rgba="0.05 0.05 0.05 1"/></material>
+    <material name="turntable_sensor_body"><color rgba="0.10 0.12 0.12 1"/></material>
+    <material name="turntable_sensor_lens"><color rgba="0.90 0.05 0.05 1"/></material>
+    <material name="turntable_sensor_ray"><color rgba="0.20 0.95 1.00 0.35"/></material>
+    <material name="turntable_belt_black"><color rgba="0.01 0.01 0.01 1"/></material>
+
+    <!-- ===== external placement (REPLACES the URDF's world_to_base) ===== -->
+    <joint name="${parent}_to_turntable_base" type="fixed">
+      <parent link="${parent}"/>
+      <child  link="base_link"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+
+    <link name="base_link">
+      <visual name="gearbase_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/gearbase.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="gearbase_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/gearbase.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingbase_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingbase.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="bearingbase_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingbase.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="nema_base_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/nema_base.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="nema_base_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/nema_base.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingstand_1_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingstand_1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="bearingstand_1_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingstand_1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingstand_2_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingstand_2.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="bearingstand_2_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingstand_2.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingstand_3_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingstand_3.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="bearingstand_3_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingstand_3.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="ballbearing_1_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="ballbearing_1_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="ballbearing_2_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_2.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="ballbearing_2_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_2.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="ballbearing_3_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_3.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="ballbearing_3_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_3.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="ballbearing_center_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_center.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="ballbearing_center_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/ballbearing_center.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingnut_1_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingnut_1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="bearingnut_1_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingnut_1.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingnut_2_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingnut_2.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="bearingnut_2_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingnut_2.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingnut_4_stl_visual">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingnut_4.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_dark_gray"/>
+      </visual>
+      <collision name="bearingnut_4_stl_collision">
+        <origin xyz="-0.268973 -0.252455 -0.001530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingnut_4.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- NEMA 17 visual placeholder.  Fixed to base_link. -->
+    <joint name="base_to_nema17_motor" type="fixed">
+      <parent link="base_link"/>
+      <child link="nema17_motor_link"/>
+      <origin xyz="0.22936 0.00000 0.05000" rpy="0 0 0"/>
+    </joint>
+
+    <link name="nema17_motor_link">
+      <visual name="nema17_body_visual">
+        <origin xyz="0 0 -0.03" rpy="0 0 0"/>
+        <geometry><box size="0.042 0.042 0.040"/></geometry>
+        <material name="turntable_motor_black"/>
+      </visual>
+      <visual name="nema17_shaft_visual">
+        <origin xyz="0 0 0.0" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0025" length="0.025"/></geometry>
+        <material name="turntable_silver"/>
+      </visual>
+    </link>
+
+    <!-- Fixed photoelectric sensor for fixture 1 only.
+         Mounted to a small independent pedestal attached directly to base_link.
+         Does NOT rotate with the disc. -->
+    <joint name="base_link_to_photoelectric_sensor_pedestal_fixture_1" type="fixed">
+      <parent link="base_link"/>
+      <child link="photoelectric_sensor_pedestal_fixture_1_link"/>
+      <origin xyz="0.255 -0.135 0.018" rpy="0 0 0"/>
+    </joint>
+
+    <link name="photoelectric_sensor_pedestal_fixture_1_link">
+      <visual name="sensor_pedestal_plate_visual">
+        <origin xyz="0 0 -0.004" rpy="0 0 0"/>
+        <geometry><box size="0.080 0.050 0.008"/></geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="sensor_pedestal_plate_collision">
+        <origin xyz="0 0 -0.004" rpy="0 0 0"/>
+        <geometry><box size="0.080 0.050 0.008"/></geometry>
+      </collision>
+      <visual name="sensor_pedestal_post_visual">
+        <origin xyz="0 0 0.040" rpy="0 0 0"/>
+        <geometry><box size="0.020 0.020 0.080"/></geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="sensor_pedestal_post_collision">
+        <origin xyz="0 0 0.040" rpy="0 0 0"/>
+        <geometry><box size="0.020 0.020 0.080"/></geometry>
+      </collision>
+    </link>
+
+    <joint name="photoelectric_pedestal_to_sensor_fixture_1" type="fixed">
+      <parent link="photoelectric_sensor_pedestal_fixture_1_link"/>
+      <child link="photoelectric_sensor_fixture_1_link"/>
+      <origin xyz="0.000 0.000 0.088" rpy="0 0 0"/>
+    </joint>
+
+    <link name="photoelectric_sensor_fixture_1_link">
+      <visual name="sick_sensor_body_visual">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.045 0.026 0.026"/></geometry>
+        <material name="turntable_sensor_body"/>
+      </visual>
+      <collision name="sick_sensor_body_collision">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry><box size="0.045 0.026 0.026"/></geometry>
+      </collision>
+      <visual name="sick_sensor_lens_visual">
+        <origin xyz="-0.025 0 0" rpy="0 1.570796 0"/>
+        <geometry><cylinder radius="0.009" length="0.006"/></geometry>
+        <material name="turntable_sensor_lens"/>
+      </visual>
+    </link>
+
+    <joint name="photoelectric_sensor_to_light_ray" type="fixed">
+      <parent link="photoelectric_sensor_fixture_1_link"/>
+      <child link="photoelectric_light_ray_fixture_1_link"/>
+      <origin xyz="-0.120 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="photoelectric_light_ray_fixture_1_link">
+      <visual name="photoelectric_light_ray_visual">
+        <origin xyz="0 0 0" rpy="0 1.570796 0"/>
+        <geometry><cylinder radius="0.003" length="0.170"/></geometry>
+        <material name="turntable_sensor_ray"/>
+      </visual>
+    </link>
+
+    <!-- Visual timing belt - NEMA driver side, fixed to nema17_motor_link. -->
+    <joint name="nema17_motor_to_belt_drive_visual" type="fixed">
+      <parent link="nema17_motor_link"/>
+      <child link="nema_belt_drive_visual_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="nema_belt_drive_visual_link">
+      <visual name="belt_motor_wrap_outer_visual">
+        <origin xyz="0.000 0.000 0.01" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.030" length="0.014"/></geometry>
+        <material name="turntable_belt_black"/>
+      </visual>
+      <visual name="belt_motor_pulley_core_visual">
+        <origin xyz="0.000 0.000 0.01" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.020" length="0.016"/></geometry>
+        <material name="turntable_silver"/>
+      </visual>
+      <visual name="belt_front_run_visual">
+        <origin xyz="-0.12218 0.030 0.01" rpy="0 0 0"/>
+        <geometry><box size="0.244 0.010 0.012"/></geometry>
+        <material name="turntable_belt_black"/>
+      </visual>
+      <visual name="belt_back_run_visual">
+        <origin xyz="-0.12218 -0.030 0.01" rpy="0 0 0"/>
+        <geometry><box size="0.244 0.010 0.012"/></geometry>
+        <material name="turntable_belt_black"/>
+      </visual>
+    </link>
+
+    <joint name="turntable_to_belt_driven_pulley_visual" type="fixed">
+      <parent link="turntable_link"/>
+      <child link="turntable_belt_driven_pulley_visual_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="turntable_belt_driven_pulley_visual_link">
+      <visual name="belt_turntable_pulley_visual">
+        <origin xyz="0.000 0.000 -0.018" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.068" length="0.012"/></geometry>
+        <material name="turntable_belt_black"/>
+      </visual>
+    </link>
+
+    <!-- Main moving joint: table_rotation_joint rotates the indexing disc around +Z. -->
+    <joint name="table_rotation_joint" type="revolute">
+      <parent link="base_link"/>
+      <child link="turntable_link"/>
+      <origin xyz="-0.015000 0.000000 0.078000" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-3.141593" upper="3.141593" effort="30" velocity="0.60"/>
+      <dynamics damping="0.05" friction="0.01"/>
+    </joint>
+
+    <link name="turntable_link">
+      <visual name="turntable_disc_stl_visual">
+        <origin xyz="-0.253973 -0.252455 -0.079530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/turntable_disc.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_silver"/>
+      </visual>
+      <collision name="turntable_disc_stl_collision">
+        <origin xyz="-0.253973 -0.252455 -0.079530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/turntable_disc.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="bearingsprocket_stl_visual">
+        <origin xyz="-0.253973 -0.252455 -0.079530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingsprocket.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_silver"/>
+      </visual>
+      <collision name="bearingsprocket_stl_collision">
+        <origin xyz="-0.253973 -0.252455 -0.079530" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/bearingsprocket.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Rivet fixture assembly 1 mounted on top of the rotating disc. -->
+    <joint name="turntable_to_rivet_fixture_1" type="fixed">
+      <parent link="turntable_link"/>
+      <child link="rivet_fixture_1_link"/>
+      <origin xyz="0.000 -0.030 0.004" rpy="0 0 0"/>
+    </joint>
+
+    <link name="rivet_fixture_1_link">
+      <visual name="rivet_fixture_top_stl_visual">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_top.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="rivet_fixture_top_stl_collision">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_top.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="rivet_fixture_bottom_stl_visual">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_bottom.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="rivet_fixture_bottom_stl_collision">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_bottom.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="fixture_1_fixed_piston_body_visual">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/piston_good.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="fixture_1_fixed_piston_body_collision">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/piston_good.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- CAFI drop/grasp frame for fixture 1.  Empty link (no debug visual). -->
+    <joint name="fixture_1_to_cafi_lateral_target_frame" type="fixed">
+      <parent link="rivet_fixture_1_link"/>
+      <child link="fixture_1_cafi_lateral_target_frame"/>
+      <origin xyz="0.003276 -0.071389 0.022476" rpy="0 0 0"/>
+    </joint>
+    <link name="fixture_1_cafi_lateral_target_frame"/>
+
+    <joint name="fixture_1_grasp_volume_fixed_joint" type="fixed">
+      <parent link="fixture_1_cafi_lateral_target_frame"/>
+      <child link="fixture_1_grasp_volume_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="fixture_1_grasp_volume_frame"/>
+
+    <!-- cafi_part_1_link kept as a frame ONLY (no visual / collision) so the
+         dynamic object_manager CAFI is the only CAFI rendered. -->
+    <joint name="fixture_to_cafi_part" type="fixed">
+      <parent link="fixture_1_cafi_lateral_target_frame"/>
+      <child link="cafi_part_1_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="cafi_part_1_link"/>
+
+    <!-- Backward-compatible alias frame.  No visual marker. -->
+    <joint name="cafi_part_to_pick_frame" type="fixed">
+      <parent link="fixture_1_cafi_lateral_target_frame"/>
+      <child link="cafi_pick_frame_1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="cafi_pick_frame_1"/>
+
+    <!-- Rivet fixture assembly 2 - duplicated 180 deg from fixture 1. -->
+    <joint name="turntable_to_rivet_fixture_2" type="fixed">
+      <parent link="turntable_link"/>
+      <child link="rivet_fixture_2_link"/>
+      <origin xyz="0.000 0.030 0.004" rpy="0 0 3.141593"/>
+    </joint>
+
+    <link name="rivet_fixture_2_link">
+      <visual name="rivet_fixture_2_top_visual">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_top.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="rivet_fixture_2_top_collision">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_top.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="rivet_fixture_2_bottom_visual">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_bottom.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="rivet_fixture_2_bottom_collision">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/rivet_fixture_bottom.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <visual name="fixture_2_fixed_piston_body_visual">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/piston_good.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+        <material name="turntable_industrial_gray"/>
+      </visual>
+      <collision name="fixture_2_fixed_piston_body_collision">
+        <origin xyz="-0.209707 -0.015035 -0.000132" rpy="1.570796 0 0"/>
+        <geometry>
+          <mesh filename="package://turntable_rivet_cell_description/meshes/piston_good.stl" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- CAFI drop/grasp frame for fixture 2.  Empty link (no debug visual). -->
+    <joint name="fixture_2_to_cafi_lateral_target_frame" type="fixed">
+      <parent link="rivet_fixture_2_link"/>
+      <child link="fixture_2_cafi_lateral_target_frame"/>
+      <origin xyz="0.003276 -0.071389 0.022476" rpy="0 0 0"/>
+    </joint>
+    <link name="fixture_2_cafi_lateral_target_frame"/>
+
+    <joint name="fixture_2_grasp_volume_fixed_joint" type="fixed">
+      <parent link="fixture_2_cafi_lateral_target_frame"/>
+      <child link="fixture_2_grasp_volume_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="fixture_2_grasp_volume_frame"/>
+
+    <joint name="fixture_2_to_cafi_part_2" type="fixed">
+      <parent link="fixture_2_cafi_lateral_target_frame"/>
+      <child link="cafi_part_2_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="cafi_part_2_link"/>
+
+    <joint name="cafi_part_2_to_pick_frame_2" type="fixed">
+      <parent link="fixture_2_cafi_lateral_target_frame"/>
+      <child link="cafi_pick_frame_2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="cafi_pick_frame_2"/>
+
+  </xacro:macro>
+
+</robot>
