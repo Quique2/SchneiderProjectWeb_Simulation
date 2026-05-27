@@ -72,6 +72,11 @@ LIFT_DZ     = 0.150
 RETREAT_DZ  = 0.120
 RELEASE_DZ  = 0.020
 RELEASE_DZ_VISION = 0.028
+# V62b: bin approach raised to 20 cm (was 12 cm).  With J5 = -pi/2
+# locked the cobot forearm passes close to the reject_bin east wall;
+# raising the approach gives the elbow + forearm enough headroom to
+# clear the bin during both APPROACH<->DROP and HOME<->APPROACH.
+APPROACH_DZ_BIN = 0.200
 
 POSE_TARGETS = [
     ("HOME",                  None),
@@ -89,9 +94,9 @@ POSE_TARGETS = [
     ("PLACE_VISION",          VISION),
     ("RELEASE_VISION",        (VISION[0],    VISION[1],    VISION[2]    + RELEASE_DZ_VISION)),
     ("RETREAT_VISION",        (VISION[0],    VISION[1],    VISION[2]    + RETREAT_DZ)),
-    ("APPROACH_ACCEPT_BIN",   (BIN_ACC[0],   BIN_ACC[1],   BIN_ACC[2]   + APPROACH_DZ)),
+    ("APPROACH_ACCEPT_BIN",   (BIN_ACC[0],   BIN_ACC[1],   BIN_ACC[2]   + APPROACH_DZ_BIN)),
     ("DROP_ACCEPT_BIN",       BIN_ACC),
-    ("APPROACH_REJECT_BIN",   (BIN_REJ[0],   BIN_REJ[1],   BIN_REJ[2]   + APPROACH_DZ)),
+    ("APPROACH_REJECT_BIN",   (BIN_REJ[0],   BIN_REJ[1],   BIN_REJ[2]   + APPROACH_DZ_BIN)),
     ("DROP_REJECT_BIN",       BIN_REJ),
 ]
 
@@ -306,11 +311,12 @@ def main():
             continue
         v60_seed = v60_resolved.POSE_LIB.get(key, prev_q)
         use_lat = name in LATERAL_GRASP_POSES
-        # J5 = -pi/2 lock: all LOAD/RIVET poses (V58 rule, cradle alignment)
-        # plus the four runtime-clamped release/drop steps.  Free elsewhere.
-        j5_lock = (J5_LOCK
-                   if (name in J5_HARD_LOCK_POSES or name in LOAD_RIVET_POSES)
-                   else None)
+        # V62b: J5 = -pi/2 lock on EVERY lateral grasp pose (V58/V51
+        # invariant — wrist points straight down so the gripper closing
+        # axis +Y is horizontal and lines up with the CAFI lateral face.
+        # Without this lock the cobot approaches the CAFI tilted and
+        # the lateral grasp degenerates into a top-down pinch.
+        j5_lock = J5_LOCK if name in LATERAL_GRASP_POSES else None
         j6_lock = J6_LOAD_RIVET_LOCK if name in LOAD_RIVET_POSES else None
         # V61: PLACE_VISION and RELEASE_VISION are notoriously prone to
         # flipping to a J6 ~ +pi wrist-flipped branch with the new chain.
